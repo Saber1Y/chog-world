@@ -18,3 +18,6 @@ contracts/broadcast/
 # Local and dry-run deployments
 contracts/deployments/local*.json
 contracts/deployments/dryrun*.json
+
+# Backend local data
+apps/backend/.data/
