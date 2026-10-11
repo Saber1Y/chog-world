@@ -1,0 +1,9 @@
+{
+  "name": "@chog-world/scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chog-world/shared": "workspace:*",
+    "viem": "^2.38.3"
+  }
+}

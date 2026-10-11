@@ -11,6 +11,7 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "contracts:test": "cd contracts && forge test",
-    "contracts:fork": "cd contracts && forge test --match-path 'test/fork/*'"
+    "contracts:fork": "cd contracts && forge test --match-path 'test/fork/*'",
+    "world:local": "node scripts/local-world.mjs"
   }
 }
