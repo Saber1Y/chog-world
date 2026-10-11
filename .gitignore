@@ -13,5 +13,8 @@ coverage/
 # Foundry
 contracts/out/
 contracts/cache/
-contracts/broadcast/*/31337/
-contracts/broadcast/**/dry-run/
+contracts/broadcast/
+
+# Local and dry-run deployments
+contracts/deployments/local*.json
+contracts/deployments/dryrun*.json
