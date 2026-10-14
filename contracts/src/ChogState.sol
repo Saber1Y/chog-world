@@ -38,6 +38,9 @@ contract ChogState is AccessControl {
 
     uint8 public constant ZONE_COUNT = 4;
 
+    // Goal bits: reputation, money, explore, strongest.
+    uint8 public constant ALL_GOALS = 0x0f;
+
     struct Character {
         bool awakened;
         uint64 bornAt;
@@ -97,6 +100,7 @@ contract ChogState is AccessControl {
     error NotAwakened();
     error CheckInTooSoon();
     error BadZone();
+    error BadGoals();
 
     constructor(address admin, IERC6551Registry registry_, address accountImplementation_) {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -175,9 +179,7 @@ contract ChogState is AccessControl {
     }
 
     function setGoals(address collection, uint256 tokenId, uint8 goalMask) external {
-        bytes32 key = _ownedAwakened(collection, tokenId);
-        _characters[key].goalMask = goalMask;
-        emit GoalsSet(key, goalMask);
+        _setGoals(_ownedAwakened(collection, tokenId), goalMask);
     }
 
     /// @notice Daily check-in: keeps the streak alive and grants an XP buff for the next 24 hours.
@@ -199,6 +201,12 @@ contract ChogState is AccessControl {
     // ---------------------------------------------------------------------
     // Game hooks
     // ---------------------------------------------------------------------
+
+    /// @notice Set goals on the owner's behalf; ChogOperator calls this from `enroll` so awakening is one signature.
+    function setGoalsFor(bytes32 key, uint8 goalMask) external onlyRole(GAME_ROLE) {
+        _awakened(key);
+        _setGoals(key, goalMask);
+    }
 
     function grantXp(bytes32 key, uint32 amount) external onlyRole(GAME_ROLE) returns (uint32 granted) {
         return _grantXp(key, amount);
@@ -344,6 +352,12 @@ contract ChogState is AccessControl {
     function _awakened(bytes32 key) internal view returns (Character storage c) {
         c = _characters[key];
         if (!c.awakened) revert NotAwakened();
+    }
+
+    function _setGoals(bytes32 key, uint8 goalMask) internal {
+        if (goalMask & ~ALL_GOALS != 0) revert BadGoals();
+        _characters[key].goalMask = goalMask;
+        emit GoalsSet(key, goalMask);
     }
 
     function _grantXp(bytes32 key, uint32 amount) internal returns (uint32 granted) {

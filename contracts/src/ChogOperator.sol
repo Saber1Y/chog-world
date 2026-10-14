@@ -112,13 +112,15 @@ contract ChogOperator {
     // Owner
     // ---------------------------------------------------------------------
 
-    /// @notice Hand your Chog to the agent under `params`. Also awakens the Chog. The owner must
-    ///         separately call `setPermissions([this],[true])` on the Chog's account.
-    function enroll(address collection, uint256 tokenId, PolicyParams calldata params) external {
+    /// @notice Hand your Chog to the agent under `params`, with the goals it should pursue. Also
+    ///         awakens the Chog. The owner must separately call `setPermissions([this],[true])` on the
+    ///         Chog's account.
+    function enroll(address collection, uint256 tokenId, PolicyParams calldata params, uint8 goalMask) external {
         if (state.ownerOfChog(collection, tokenId) != msg.sender) revert NotChogOwner();
         _validate(params);
         state.awaken(collection, tokenId);
         bytes32 key = state.keyOf(collection, tokenId);
+        state.setGoalsFor(key, goalMask);
         _policies[key] = Policy({
             owner: msg.sender,
             active: true,
