@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+/*
+ * CHOG World: an arcade sticker pack. Thick ink outlines like the Chog art, chunky offset shadows,
+ * night-purple ground, Monad purple and coin gold as the two loud colours. Each Chog's page also
+ * sets --chog (its DNA hue) so its own colour runs through it.
+ */
+:root {
+  --night: #120c22;
+  --night-2: #1b1430;
+  --night-3: #261c42;
+  --ink: #0b0716;
+  --paper: #fbf6ff;
+  --muted: #b7a9d6;
+  --monad: #836ef9;
+  --monad-deep: #5b45e0;
+  --gold: #ffd23f;
+  --gold-deep: #e0a800;
+  --mint: #3ee089;
+  --danger: #ff4d5e;
+  --chog: var(--monad);
+}
+
+@theme inline {
+  --color-night: var(--night);
+  --color-night-2: var(--night-2);
+  --color-night-3: var(--night-3);
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-muted: var(--muted);
+  --color-monad: var(--monad);
+  --color-monad-deep: var(--monad-deep);
+  --color-gold: var(--gold);
+  --color-gold-deep: var(--gold-deep);
+  --color-mint: var(--mint);
+  --color-danger: var(--danger);
+  --color-chog: var(--chog);
+  --font-display: var(--font-lilita), "Arial Black", sans-serif;
+  --font-sans: var(--font-rubik), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --shadow-sticker: 4px 4px 0 0 var(--ink);
+  --shadow-sticker-lg: 7px 7px 0 0 var(--ink);
+}
+
+html {
+  background: var(--night);
+  color-scheme: dark;
+}
+
+body {
+  background:
+    radial-gradient(circle at 15% -10%, color-mix(in oklab, var(--monad) 28%, transparent), transparent 45%),
+    radial-gradient(circle at 110% 30%, color-mix(in oklab, var(--gold) 10%, transparent), transparent 40%),
+    var(--night);
+  background-attachment: fixed;
+  color: var(--paper);
+  font-family: var(--font-sans);
+  min-height: 100dvh;
+}
+
+/* A sticker: ink outline, offset shadow, presses down when clicked. */
+@utility sticker {
+  border: 3px solid var(--ink);
+  box-shadow: var(--shadow-sticker);
+  border-radius: 18px;
+}
+
+@utility press {
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  &:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0 0 var(--ink);
+  }
+  &:active {
+    transform: translate(3px, 3px);
+    box-shadow: 1px 1px 0 0 var(--ink);
+  }
+}
+
+:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+  border-radius: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-pop-in {
+  animation: pop-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-8px) rotate(2deg); }
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
