@@ -13,5 +13,10 @@
     "contracts:test": "cd contracts && forge test",
     "contracts:fork": "cd contracts && forge test --match-path 'test/fork/*'",
     "world:local": "node scripts/local-world.mjs"
+  },
+  "pnpm": {
+    "overrides": {
+      "viem": "2.57.7"
+    }
   }
 }
