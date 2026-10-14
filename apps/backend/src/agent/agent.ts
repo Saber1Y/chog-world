@@ -103,7 +103,10 @@ export class Agent {
     const decision = await this.decider.decide(ctx, candidates);
     const { actionId, outcome } = await this.executor.execute(s.key, tokenId, decision, randomUUID());
 
-    await this.journal.write({
+    // Consecutive rests are one story beat, not one per tick: skip a rest that follows a rest.
+    const latest = (await this.journal.list(s.key, { limit: 1 }))[0];
+    const repeatRest = outcome.status === "rested" && latest?.kind === "thought" && (latest.data as { kind?: string } | null)?.kind === "rest";
+    if (!repeatRest) await this.journal.write({
       chogKey: s.key,
       kind: "thought",
       title: decision.thought,
