@@ -255,6 +255,11 @@ export const chogOperatorAbi = [
             "internalType": "uint128"
           }
         ]
+      },
+      {
+        "name": "goalMask",
+        "type": "uint8",
+        "internalType": "uint8"
       }
     ],
     "outputs": [],

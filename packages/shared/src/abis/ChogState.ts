@@ -23,6 +23,19 @@ export const chogStateAbi = [
   },
   {
     "type": "function",
+    "name": "ALL_GOALS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "BUFF_DURATION",
     "inputs": [],
     "outputs": [
@@ -1089,6 +1102,24 @@ export const chogStateAbi = [
   },
   {
     "type": "function",
+    "name": "setGoalsFor",
+    "inputs": [
+      {
+        "name": "key",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "goalMask",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setItems",
     "inputs": [
       {
@@ -1617,6 +1648,11 @@ export const chogStateAbi = [
         "internalType": "bytes32"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "BadGoals",
+    "inputs": []
   },
   {
     "type": "error",
