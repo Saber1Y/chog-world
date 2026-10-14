@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPublicClient, createWalletClient, http, parseAbi } from "viem";
-import { EXTERNAL, chogOperatorAbi, accountV3Abi, chogStateAbi, POLICY_PRESETS } from "@chog-world/shared";
+import { EXTERNAL, chogOperatorAbi, accountV3Abi, chogStateAbi, Goal, POLICY_PRESETS } from "@chog-world/shared";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = process.env.PORT ?? "8545";
@@ -53,14 +53,16 @@ const registry = parseAbi(["function createAccount(address,bytes32,uint256,addre
 const proxy = parseAbi(["function initialize(address implementation)"]);
 const p = POLICY_PRESETS.BALANCED;
 
-for (const owner of OWNERS) {
+// A mix of goals so the local world shows different behaviour.
+const GOALS = [Goal.MONEY, Goal.REPUTATION | Goal.STRONGEST, Goal.EXPLORE, 0];
+for (const [i, owner] of OWNERS.entries()) {
   const id = await pub.readContract({ address: d.collection, abi: devChog, functionName: "nextId" });
   await send(owner, d.collection, devChog, "mint", [owner]);
   const account = await pub.readContract({ address: d.state, abi: chogStateAbi, functionName: "accountOf", args: [d.collection, id] });
   await send(owner, EXTERNAL.erc6551Registry, registry, "createAccount", [EXTERNAL.tokenboundAccountProxy, `0x${"0".repeat(64)}`, 10143n, d.collection, id]);
   await send(owner, account, proxy, "initialize", [EXTERNAL.tokenboundAccountV3]);
   await send(owner, account, accountV3Abi, "setPermissions", [[d.operator], [true]]);
-  await send(owner, d.operator, chogOperatorAbi, "enroll", [d.collection, id, { expiry: 0n, actionMask: 0x0f, maxActionsPerDay: p.maxActionsPerDay, maxPerAction: p.maxPerAction, dailyCap: p.dailyCap }]);
+  await send(owner, d.operator, chogOperatorAbi, "enroll", [d.collection, id, { expiry: 0n, actionMask: 0x0f, maxActionsPerDay: p.maxActionsPerDay, maxPerAction: p.maxPerAction, dailyCap: p.dailyCap }, GOALS[i % GOALS.length]]);
   await send(ADMIN, d.chogToken, devToken, "mint", [account, 400n * 10n ** 18n]);
   console.log(`Chog #${id} awakened for ${owner} (account ${account})`);
 }

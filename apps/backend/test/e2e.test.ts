@@ -16,7 +16,7 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import { accountV3Abi, chogOperatorAbi, chogStateAbi, EXTERNAL, monadTestnet, POLICY_PRESETS, simulate, type Stats } from "@chog-world/shared";
+import { accountV3Abi, chogOperatorAbi, chogStateAbi, EXTERNAL, monadTestnet, POLICY_PRESETS, simulate, Goal, type Stats } from "@chog-world/shared";
 import { loadEnv } from "../src/config/env.js";
 import { buildContext, type AppContext } from "../src/app/context.js";
 import { actions, battles, chogs, questRuns } from "../src/database/schema.js";
@@ -94,6 +94,7 @@ describe("M1: autonomous loop end to end on a Monad testnet fork", () => {
       d.collection,
       tokenId,
       { expiry: 0n, actionMask: 0x0f, maxActionsPerDay: p.maxActionsPerDay, maxPerAction: p.maxPerAction, dailyCap: p.dailyCap },
+      Goal.MONEY | Goal.STRONGEST,
     ]);
     await write(ADMIN, d.chogToken, devTokenAbi, "mint", [account, fundChog]);
     return account;
@@ -152,6 +153,7 @@ describe("M1: autonomous loop end to end on a Monad testnet fork", () => {
     const rows = await ctx.dbHandle.db.select().from(chogs);
     expect(rows.map((r) => r.tokenId).sort()).toEqual(["1", "2"]);
     expect(rows.every((r) => r.enrolled)).toBe(true);
+    expect(rows.every((r) => r.goalMask === (Goal.MONEY | Goal.STRONGEST))).toBe(true);
     const journal = await ctx.journal.list(rows[0]!.key);
     expect(journal.map((j) => j.title)).toContain("Handed the reins to its agent");
   });
