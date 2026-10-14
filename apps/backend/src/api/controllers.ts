@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 import type { Response } from "express";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { erc721Abi, isAddress, parseAbi, zeroHash, type Address } from "viem";
-import { EXTERNAL, erc6551RegistryAbi } from "@chog-world/shared";
+import { EXTERNAL, erc6551RegistryAbi, normalizeProfileText, profileMessage, PROFILE_MAX_AGE_MS, NICKNAME_MAX, PERSONALITY_MAX } from "@chog-world/shared";
 
 /** Mirrors Arena.RIVALRY_THRESHOLD. */
 const ARENA_RIVALRY_THRESHOLD = 3;
@@ -29,8 +29,7 @@ const accountProxyAbi = parseAbi(["function initialize(address implementation)"]
 import { z } from "zod";
 import { APP_CONTEXT, type AppContext } from "../app/context.js";
 import { battles, chogs } from "../database/schema.js";
-import { normalize, screen } from "../security/firewall.js";
-import { profileMessage, PROFILE_MAX_AGE_MS } from "./profile.js";
+import { screen } from "../security/firewall.js";
 import { json } from "./json.js";
 import { artStateOf, metadataOf } from "../render/state.js";
 
@@ -130,8 +129,8 @@ export class OwnersController {
 }
 
 const ProfileBody = z.object({
-  nickname: z.string().max(40).nullable(),
-  personality: z.string().max(140).nullable(),
+  nickname: z.string().max(NICKNAME_MAX).nullable(),
+  personality: z.string().max(PERSONALITY_MAX).nullable(),
   issuedAt: z.string().datetime(),
   signature: z.string().regex(/^0x[0-9a-fA-F]+$/),
 });
@@ -228,12 +227,16 @@ export class ChogsController {
     const issued = new Date(p.issuedAt).getTime();
     if (Math.abs(Date.now() - issued) > PROFILE_MAX_AGE_MS) throw new BadRequestException("signature expired; sign again");
 
-    const nickname = p.nickname ? normalize(p.nickname) : null;
-    const personality = p.personality ? normalize(p.personality) : null;
+    const nickname = p.nickname ? normalizeProfileText(p.nickname) || null : null;
+    const personality = p.personality ? normalizeProfileText(p.personality) || null : null;
     for (const [field, text] of [["nickname", nickname], ["personality", personality]] as const) {
       if (!text) continue;
       const r = screen(text);
-      if (!r.ok) throw new BadRequestException(`${field} reads like instructions to the agent (${r.hits.join(", ")}); describe the Chog instead`);
+      if (!r.ok) {
+        throw new BadRequestException(
+          `That ${field} reads like instructions to the agent. Describe the Chog instead (for example "greedy but cautious, hates slime").`,
+        );
+      }
     }
 
     const snapshot = await this.ctx.reader.snapshot(tokenId);

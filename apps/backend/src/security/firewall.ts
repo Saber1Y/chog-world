@@ -38,8 +38,3 @@ export function screen(text: string): ScreenResult {
   const hits = SIGNATURES.filter((s) => s.re.test(text)).map((s) => s.id);
   return { ok: hits.length === 0, hits };
 }
-
-/** Collapse whitespace and strip control characters before storing. */
-export function normalize(text: string): string {
-  return text.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
-}

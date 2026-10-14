@@ -1,7 +1,17 @@
 /** Signed profile updates expire after this long, so a leaked signature cannot be replayed later. */
 export const PROFILE_MAX_AGE_MS = 10 * 60_000;
+export const NICKNAME_MAX = 40;
+export const PERSONALITY_MAX = 140;
 
-/** The exact text an owner signs to set their Chog's nickname and personality. Shared with the web app. */
+/** Collapse whitespace and strip control characters. Applied before signing and before verifying. */
+export function normalizeProfileText(text: string): string {
+  return text.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * The exact text an owner signs to set their Chog's nickname and personality. The web app signs it
+ * and the backend rebuilds it to verify, so both must use this function with normalized fields.
+ */
 export function profileMessage(p: {
   chainId: number;
   tokenId: bigint;
