@@ -9,10 +9,8 @@ import {
   chogOperatorAbi,
   ALL_ACTIONS,
   Goal,
-  GOAL_LABELS,
   POLICY_PRESETS,
   type Deployment,
-  type GoalKey,
   type PolicyPresetKey,
 } from "@chog-world/shared";
 import { api, type ChogView } from "@/lib/api";
@@ -20,6 +18,7 @@ import { isTestnet } from "@/lib/config";
 import { chog as fmtChog } from "@/lib/format";
 import { useTx } from "@/hooks/useTx";
 import { TxStatus } from "./TxStatus";
+import { GoalPicker, PresetPicker } from "./PolicyPickers";
 
 const faucetAbi = parseAbi(["function faucet(address to)"]);
 
@@ -53,13 +52,20 @@ export function AwakenWizard({ chog, deployment }: { chog: ChogView; deployment:
     fund: funded,
   };
   const current = STEPS.find((s) => !done[s.id])?.id;
+  // Creating the wallet is free (sponsored); the other steps each need one signature.
+  const signaturesLeft = STEPS.filter((s) => s.id !== "account" && !done[s.id]).length;
+  const name = chog.profile?.nickname ?? `Chog #${chog.tokenId}`;
+  const returning = chog.character.awakened;
 
   return (
     <section className="sticker bg-night-2 p-6 sm:p-8" aria-labelledby="awaken-title">
       <h2 id="awaken-title" className="font-display text-4xl">
-        Awaken Chog #{chog.tokenId}
+        {returning ? `Wake ${name}'s agent` : `Awaken ${name}`}
       </h2>
-      <p className="mt-2 text-muted">Three signatures and it starts living on its own. You can stop here and come back: progress is saved onchain.</p>
+      <p className="mt-2 text-muted">
+        {signaturesLeft === 1 ? "One signature" : `${signaturesLeft} signatures`} and it starts living on its own. You can stop here and come back:
+        progress is saved onchain.
+      </p>
 
       <ol className="mt-8 space-y-4">
         {STEPS.map((s, i) => {
@@ -168,9 +174,6 @@ function PermissionStep({ account, operator, onDone }: { account: Address; opera
   );
 }
 
-const GOAL_KEYS = Object.keys(Goal) as GoalKey[];
-const PRESET_KEYS = Object.keys(POLICY_PRESETS) as PolicyPresetKey[];
-
 function EnrollStep({ chog, deployment, onDone }: { chog: ChogView; deployment: Deployment; onDone: () => void }) {
   const { writeContractAsync } = useWriteContract();
   const tx = useTx();
@@ -180,54 +183,8 @@ function EnrollStep({ chog, deployment, onDone }: { chog: ChogView; deployment: 
 
   return (
     <div className="space-y-6">
-      <fieldset>
-        <legend className="mb-2 text-sm font-bold uppercase tracking-wider text-muted">It should…</legend>
-        <div className="flex flex-wrap gap-2">
-          {GOAL_KEYS.map((k) => {
-            const on = (goals & Goal[k]) !== 0;
-            return (
-              <button
-                key={k}
-                type="button"
-                aria-pressed={on}
-                onClick={() => setGoals((g) => g ^ Goal[k])}
-                className={`rounded-full border-[3px] border-ink px-4 py-2 text-sm font-bold transition-colors ${
-                  on ? "bg-monad text-paper shadow-[3px_3px_0_0_var(--ink)]" : "bg-night text-muted hover:text-paper"
-                }`}
-              >
-                {GOAL_LABELS[k]}
-              </button>
-            );
-          })}
-        </div>
-        {goals === 0 && <p className="mt-2 text-xs text-muted">No goals: it will balance everything.</p>}
-      </fieldset>
-
-      <fieldset>
-        <legend className="mb-2 text-sm font-bold uppercase tracking-wider text-muted">Daily budget</legend>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {PRESET_KEYS.map((k) => {
-            const v = POLICY_PRESETS[k];
-            const on = k === preset;
-            return (
-              <label
-                key={k}
-                className={`cursor-pointer rounded-2xl border-[3px] border-ink p-4 transition-transform ${
-                  on ? "-translate-y-0.5 bg-gold text-ink shadow-[4px_4px_0_0_var(--ink)]" : "bg-night hover:-translate-y-0.5"
-                }`}
-              >
-                <input type="radio" name="preset" value={k} checked={on} onChange={() => setPreset(k)} className="sr-only" />
-                <span className="font-display text-xl">{v.label}</span>
-                <span className={`mt-1 block text-sm ${on ? "text-ink/80" : "text-muted"}`}>
-                  {fmtChog(v.dailyCap)} CHOG a day
-                  <br />
-                  up to {fmtChog(v.maxPerAction)} per move, {v.maxActionsPerDay} moves
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      </fieldset>
+      <GoalPicker value={goals} onChange={setGoals} />
+      <PresetPicker value={preset} onChange={setPreset} />
 
       <div className="space-y-2">
         <PrimaryButton
@@ -291,6 +248,7 @@ function FundStep({ chog, deployment, onDone }: { chog: ChogView; deployment: De
         <label className="flex items-center gap-2">
           <span className="sr-only">Custom amount</span>
           <input
+            aria-label="Amount of CHOG to send"
             inputMode="decimal"
             value={amount}
             onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
