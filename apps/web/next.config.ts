@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Lets a production build run alongside `next dev` without clobbering it (NEXT_DIST_DIR=.next-build).
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   transpilePackages: ["@chog-world/shared"],
   images: {
     remotePatterns: [{ protocol: "http", hostname: "localhost" }, { protocol: "https", hostname: "**" }],
