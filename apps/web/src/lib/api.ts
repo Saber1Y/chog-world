@@ -126,6 +126,45 @@ export interface LeaderRow {
   enrolled: boolean;
 }
 
+export interface ChogRef {
+  key: string;
+  tokenId: string;
+  nickname: string | null;
+}
+
+export interface Battle {
+  battleId: string;
+  attKey: string;
+  defKey: string;
+  tier: number;
+  fee: string;
+  startBlock: number;
+  status: "pending" | "resolved" | "voided";
+  attackerWon: boolean | null;
+  seed: Hex | null;
+  logHash: Hex | null;
+  rounds: number | null;
+  repDelta: number | null;
+  payout: string | null;
+  /** Present only when the indexer verified the replay against the onchain logHash. */
+  attStats: Stats | null;
+  defStats: Stats | null;
+  resolveTx: string | null;
+  createdAt: string;
+  attacker: ChogRef | null;
+  defender: ChogRef | null;
+}
+
+export interface Rivalry {
+  a: ChogRef | null;
+  b: ChogRef | null;
+  fights: number;
+  winsA: number;
+  winsB: number;
+  rivals: boolean;
+  lastBattleId: string;
+}
+
 export interface Digest {
   text: string;
   writtenBy: "llm" | "template";
@@ -141,6 +180,10 @@ export const api = {
   chog: (tokenId: string) => request<ChogView>(`/chogs/${tokenId}`),
   journal: (tokenId: string) => request<JournalEntry[]>(`/chogs/${tokenId}/journal?limit=60`),
   digest: (tokenId: string, since: string) => request<Digest | null>(`/chogs/${tokenId}/digest?since=${encodeURIComponent(since)}`),
+  battles: (limit = 30) => request<Battle[]>(`/arena/battles?limit=${limit}`),
+  battle: (id: string) => request<Battle>(`/arena/battles/${id}`),
+  rivalries: () => request<Rivalry[]>("/arena/rivalries"),
+  chogBattles: (tokenId: string) => request<Omit<Battle, "attacker" | "defender">[]>(`/chogs/${tokenId}/battles`),
   createAccount: (tokenId: string) =>
     request<{ account: Address; created: boolean; txHashes?: Hex[] }>(`/chogs/${tokenId}/account`, { method: "POST" }),
   nudge: (tokenId: string) => request<{ queued: boolean }>(`/chogs/${tokenId}/nudge`, { method: "POST" }),

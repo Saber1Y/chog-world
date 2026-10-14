@@ -83,8 +83,9 @@ body {
   border-radius: 10px;
 }
 
+/* Reduced motion: no movement anywhere; the replay's damage numbers keep a gentle fade (below). */
 @media (prefers-reduced-motion: reduce) {
-  *,
+  *:not(.dmg-pop),
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
@@ -112,4 +113,45 @@ body {
 }
 .animate-float {
   animation: float 6s ease-in-out infinite;
+}
+
+/* Arena replay */
+:root {
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+}
+.hp-fill {
+  transform-origin: left center;
+  transition: transform 320ms var(--ease-out-strong), background-color 200ms ease;
+}
+@keyframes dmg-pop {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(0.9); }
+  18% { opacity: 1; transform: translate(-50%, -6px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -34px) scale(1); }
+}
+.dmg-pop {
+  animation: dmg-pop 900ms var(--ease-out-strong) both;
+}
+@keyframes hit-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px) rotate(-1.5deg); }
+  45% { transform: translateX(5px) rotate(1deg); }
+  70% { transform: translateX(-3px); }
+}
+.hit-shake {
+  animation: hit-shake 320ms ease-out;
+}
+@keyframes lunge-right {
+  0%, 100% { transform: translateX(0); }
+  40% { transform: translateX(14px); }
+}
+@keyframes lunge-left {
+  0%, 100% { transform: translateX(0); }
+  40% { transform: translateX(-14px); }
+}
+.lunge-right { animation: lunge-right 260ms var(--ease-out-strong); }
+.lunge-left { animation: lunge-left 260ms var(--ease-out-strong); }
+@media (prefers-reduced-motion: reduce) {
+  .hit-shake, .lunge-right, .lunge-left { animation: none; }
+  .dmg-pop { animation: dmg-fade 900ms ease both; }
+  @keyframes dmg-fade { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
 }
