@@ -86,7 +86,8 @@ contract MonadForkTest is Test, ChogWorldDeployer {
                 TOKEN_ID,
                 ChogOperator.PolicyParams({
                     expiry: 0, actionMask: 0x0f, maxActionsPerDay: 20, maxPerAction: 60 ether, dailyCap: 150 ether
-                })
+                }),
+                0
             );
         vm.stopPrank();
     }

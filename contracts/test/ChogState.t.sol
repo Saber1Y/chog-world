@@ -73,6 +73,20 @@ contract ChogStateTest is ChogWorldBase {
         assertEq(w.state.character(_key(ALICE_CHOG)).goalMask, 0x3);
     }
 
+    function test_SetGoalsForRequiresGameRole() public {
+        _awaken(alice, ALICE_CHOG, 0);
+        bytes32 key = _key(ALICE_CHOG);
+        vm.prank(alice);
+        vm.expectRevert();
+        w.state.setGoalsFor(key, 0x1);
+        vm.prank(address(w.operator));
+        w.state.setGoalsFor(key, 0x5);
+        assertEq(w.state.character(key).goalMask, 0x5);
+        vm.prank(alice);
+        vm.expectRevert(ChogState.BadGoals.selector);
+        w.state.setGoals(address(nft), ALICE_CHOG, 0xff);
+    }
+
     function test_CheckInStreakAndBuff() public {
         _awaken(alice, ALICE_CHOG, 0);
         vm.startPrank(alice);

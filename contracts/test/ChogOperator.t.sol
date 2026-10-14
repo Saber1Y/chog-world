@@ -6,6 +6,7 @@ import {IAccountV3} from "../src/interfaces/IERC6551.sol";
 import {ChogWorldBase} from "./ChogWorldBase.t.sol";
 import {ChogOperator} from "../src/ChogOperator.sol";
 import {QuestBoard} from "../src/QuestBoard.sol";
+import {ChogState} from "../src/ChogState.sol";
 
 contract ChogOperatorTest is ChogWorldBase {
     uint32 internal constant SLIME = 0; // fee 5
@@ -60,11 +61,25 @@ contract ChogOperatorTest is ChogWorldBase {
         assertEq(w.operator.remainingDailyCap(address(nft), ALICE_CHOG), 150 ether);
     }
 
+    function test_EnrollSetsGoalsInTheSameCall() public {
+        _createAccount(BOB_CHOG);
+        vm.prank(bob);
+        w.operator.enroll(address(nft), BOB_CHOG, _defaultPolicy(), 0x0a); // money + strongest
+        assertEq(w.state.character(_key(BOB_CHOG)).goalMask, 0x0a);
+    }
+
+    function test_EnrollRejectsUnknownGoals() public {
+        ChogOperator.PolicyParams memory p = _defaultPolicy();
+        vm.prank(bob);
+        vm.expectRevert(ChogState.BadGoals.selector);
+        w.operator.enroll(address(nft), BOB_CHOG, p, 0x10);
+    }
+
     function test_EnrollOnlyByOwner() public {
         ChogOperator.PolicyParams memory p = _defaultPolicy();
         vm.prank(alice);
         vm.expectRevert(ChogOperator.NotChogOwner.selector);
-        w.operator.enroll(address(nft), BOB_CHOG, p);
+        w.operator.enroll(address(nft), BOB_CHOG, p, 0);
     }
 
     function test_EnrollRejectsBadPolicy() public {
@@ -72,31 +87,31 @@ contract ChogOperatorTest is ChogWorldBase {
         p.actionMask = 0;
         vm.prank(bob);
         vm.expectRevert(ChogOperator.BadPolicy.selector);
-        w.operator.enroll(address(nft), BOB_CHOG, p);
+        w.operator.enroll(address(nft), BOB_CHOG, p, 0);
 
         p = _defaultPolicy();
         p.actionMask = 0x10;
         vm.prank(bob);
         vm.expectRevert(ChogOperator.BadPolicy.selector);
-        w.operator.enroll(address(nft), BOB_CHOG, p);
+        w.operator.enroll(address(nft), BOB_CHOG, p, 0);
 
         p = _defaultPolicy();
         p.maxPerAction = p.dailyCap + 1;
         vm.prank(bob);
         vm.expectRevert(ChogOperator.BadPolicy.selector);
-        w.operator.enroll(address(nft), BOB_CHOG, p);
+        w.operator.enroll(address(nft), BOB_CHOG, p, 0);
 
         p = _defaultPolicy();
         p.maxActionsPerDay = 0;
         vm.prank(bob);
         vm.expectRevert(ChogOperator.BadPolicy.selector);
-        w.operator.enroll(address(nft), BOB_CHOG, p);
+        w.operator.enroll(address(nft), BOB_CHOG, p, 0);
 
         p = _defaultPolicy();
         p.expiry = uint64(block.timestamp);
         vm.prank(bob);
         vm.expectRevert(ChogOperator.BadPolicy.selector);
-        w.operator.enroll(address(nft), BOB_CHOG, p);
+        w.operator.enroll(address(nft), BOB_CHOG, p, 0);
     }
 
     // ---------------------------------------------------------------------
@@ -346,7 +361,7 @@ contract ChogOperatorTest is ChogWorldBase {
         perms[0] = true;
         vm.startPrank(bob);
         IAccountV3(aliceAcc).setPermissions(callers, perms);
-        w.operator.enroll(address(nft), ALICE_CHOG, _defaultPolicy());
+        w.operator.enroll(address(nft), ALICE_CHOG, _defaultPolicy(), 0);
         vm.stopPrank();
         (bool ok,) = _quest(SLIME);
         assertTrue(ok);

@@ -127,7 +127,7 @@ abstract contract ChogWorldBase is Test, ChogWorldDeployer {
         perms[0] = true;
         vm.startPrank(owner);
         IAccountV3(account).setPermissions(callers, perms);
-        w.operator.enroll(address(nft), id, _defaultPolicy());
+        w.operator.enroll(address(nft), id, _defaultPolicy(), 0);
         vm.stopPrank();
         if (funding > 0) chog.mint(account, funding);
     }
