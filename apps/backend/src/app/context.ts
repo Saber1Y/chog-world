@@ -12,6 +12,7 @@ import { Holders } from "../holders/holders.js";
 import { Executor } from "../agent/executor.js";
 import { Agent } from "../agent/agent.js";
 import { ClaudeDecider, HeuristicDecider, type Decider } from "../agent/decider.js";
+import { Renderer } from "../render/render.js";
 
 /** Composition root: every service, built once from the environment. Nest controllers receive this. */
 export interface AppContext {
@@ -25,6 +26,7 @@ export interface AppContext {
   resolver: Resolver;
   holders: Holders;
   agent: Agent;
+  renderer: Renderer;
   llmEnabled: boolean;
 }
 
@@ -62,5 +64,7 @@ export async function buildContext(env: Env, log: (scope: string, msg: string) =
     (m) => log("agent", m),
   );
 
-  return { env, dbHandle, chain, reader, journal, digests, indexer, resolver, holders, agent, llmEnabled };
+  const renderer = new Renderer(env.ART_CACHE_PATH);
+
+  return { env, dbHandle, chain, reader, journal, digests, indexer, resolver, holders, agent, renderer, llmEnabled };
 }

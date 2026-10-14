@@ -11,15 +11,25 @@ import {
   Post,
   Put,
   Query,
+  Res,
+  ConflictException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
+import { createHash } from "node:crypto";
+import type { Response } from "express";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
-import { isAddress, type Address } from "viem";
+import { erc721Abi, isAddress, parseAbi, zeroHash, type Address } from "viem";
+import { EXTERNAL, erc6551RegistryAbi } from "@chog-world/shared";
+import { revertReason } from "../chain/chain.js";
+
+const accountProxyAbi = parseAbi(["function initialize(address implementation)"]);
 import { z } from "zod";
 import { APP_CONTEXT, type AppContext } from "../app/context.js";
 import { battles, chogs } from "../database/schema.js";
 import { normalize, screen } from "../security/firewall.js";
 import { profileMessage, PROFILE_MAX_AGE_MS } from "./profile.js";
 import { json } from "./json.js";
+import { artStateOf, metadataOf } from "../render/state.js";
 
 function tokenIdParam(raw: string): bigint {
   if (!/^\d{1,6}$/.test(raw)) throw new BadRequestException("tokenId must be a positive integer");
@@ -129,12 +139,7 @@ export class ChogsController {
   @Get(":tokenId")
   async get(@Param("tokenId") raw: string) {
     const tokenId = tokenIdParam(raw);
-    let snapshot;
-    try {
-      snapshot = await this.ctx.reader.snapshot(tokenId);
-    } catch {
-      throw new NotFoundException(`Chog #${tokenId} does not exist`);
-    }
+    const snapshot = await this.snapshotOr404(tokenId);
     const [row] = await this.ctx.dbHandle.db.select().from(chogs).where(eq(chogs.key, snapshot.key));
     return json({
       ...snapshot,
@@ -142,6 +147,45 @@ export class ChogsController {
       agent: row ? { enrolled: row.enrolled, nextTickAt: row.nextTickAt, lastTickAt: row.lastTickAt, lastTickNote: row.lastTickNote } : null,
       earned: row?.earned ?? "0",
     });
+  }
+
+  /** The evolved Chog as a PNG. `size` 128..1024; cached by state, so it changes only when the Chog does. */
+  @Get(":tokenId/image.png")
+  async image(@Param("tokenId") raw: string, @Query("size") sizeRaw: string | undefined, @Res() res: Response) {
+    const tokenId = tokenIdParam(raw);
+    const size = sizeRaw ? Math.round(Number(sizeRaw)) : 1024;
+    if (!Number.isFinite(size) || size < 128 || size > 1024) throw new BadRequestException("size must be 128..1024");
+    const { art } = await this.artOf(tokenId);
+    const etag = `"${createHash("sha1").update(JSON.stringify(art)).update(String(size)).digest("hex")}"`;
+    res.setHeader("ETag", etag);
+    res.setHeader("Cache-Control", "public, max-age=30");
+    if (res.req.headers["if-none-match"] === etag) {
+      res.status(304).end();
+      return;
+    }
+    const png = await this.ctx.renderer.png(art, size);
+    res.type("png").send(png);
+  }
+
+  @Get(":tokenId/meta")
+  async meta(@Param("tokenId") raw: string) {
+    const tokenId = tokenIdParam(raw);
+    const { snapshot, art } = await this.artOf(tokenId);
+    return metadataOf(snapshot, art, `${this.ctx.env.PUBLIC_URL}/chogs/${tokenId}/image.png`);
+  }
+
+  private async snapshotOr404(tokenId: bigint) {
+    try {
+      return await this.ctx.reader.snapshot(tokenId);
+    } catch {
+      throw new NotFoundException(`Chog #${tokenId} does not exist`);
+    }
+  }
+
+  private async artOf(tokenId: bigint) {
+    const snapshot = await this.snapshotOr404(tokenId);
+    const [row] = await this.ctx.dbHandle.db.select({ nickname: chogs.nickname }).from(chogs).where(eq(chogs.key, snapshot.key));
+    return { snapshot, art: artStateOf(snapshot, row?.nickname ?? null) };
   }
 
   @Get(":tokenId/journal")
@@ -197,6 +241,51 @@ export class ChogsController {
     await this.ctx.dbHandle.db.update(chogs).set({ nickname, personality }).where(eq(chogs.key, snapshot.key));
     return { nickname, personality };
   }
+
+  /**
+   * Creates the Chog's token-bound account, paid by the keeper, so awakening costs the owner nothing
+   * extra. Creating and initializing are permissionless and give the caller no rights over the
+   * account: it is controlled only by whoever owns the NFT.
+   */
+  @Post(":tokenId/account")
+  async createAccount(@Param("tokenId") raw: string) {
+    const tokenId = tokenIdParam(raw);
+    const d = this.ctx.chain.deployment;
+    const client = this.ctx.chain.publicClient;
+    try {
+      await client.readContract({ address: d.collection, abi: erc721Abi, functionName: "ownerOf", args: [tokenId] });
+    } catch {
+      throw new NotFoundException(`Chog #${tokenId} does not exist`);
+    }
+    const account = await this.ctx.reader.accountOf(tokenId);
+    const code = await client.getCode({ address: account });
+    if (code && code !== "0x") return { account, created: false };
+
+    const key = `account:${tokenId}`;
+    if (this.creating.has(key)) throw new ConflictException("account creation already in progress");
+    this.creating.add(key);
+    try {
+      const { hash } = await this.ctx.chain.keeper.send({
+        address: EXTERNAL.erc6551Registry,
+        abi: erc6551RegistryAbi,
+        functionName: "createAccount",
+        args: [EXTERNAL.tokenboundAccountProxy, zeroHash, BigInt(this.ctx.chain.chain.id), d.collection, tokenId],
+      });
+      const { hash: initHash } = await this.ctx.chain.keeper.send({
+        address: account,
+        abi: accountProxyAbi,
+        functionName: "initialize",
+        args: [EXTERNAL.tokenboundAccountV3],
+      });
+      return { account, created: true, txHashes: [hash, initHash] };
+    } catch (err) {
+      throw new ServiceUnavailableException(`could not create the account: ${revertReason(err)}`);
+    } finally {
+      this.creating.delete(key);
+    }
+  }
+
+  private readonly creating = new Set<string>();
 
   /**
    * Asks the agent to act soon (after the owner enrolls or tops up). Safe to expose: the agent can

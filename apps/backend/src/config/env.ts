@@ -18,7 +18,7 @@ const privateKey = z
  */
 export const envSchema = z.object({
   PORT: z.coerce.number().int().default(9100),
-  CORS_ORIGIN: z.string().default("http://localhost:3000"),
+  CORS_ORIGIN: z.string().default("http://localhost:3100"),
 
   /** 143 mainnet, 10143 testnet, or an anvil fork of either. */
   CHAIN_ID: z.coerce.number().int().default(10143),
@@ -60,6 +60,11 @@ export const envSchema = z.object({
   COLLECTION_SUPPLY: z.coerce.number().int().positive().optional(),
 
   KEEPER_ADDRESS_EXPECTED: address.optional(),
+
+  /** Where the shared Chog art is cached after the first IPFS fetch. */
+  ART_CACHE_PATH: z.string().default("./.data/chog-base.png"),
+  /** Public base URL of this API, used for image links in metadata. */
+  PUBLIC_URL: z.string().url().default("http://localhost:9100"),
 });
 
 export type Env = z.infer<typeof envSchema>;
