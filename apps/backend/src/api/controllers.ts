@@ -20,6 +20,9 @@ import type { Response } from "express";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { erc721Abi, isAddress, parseAbi, zeroHash, type Address } from "viem";
 import { EXTERNAL, erc6551RegistryAbi } from "@chog-world/shared";
+
+/** Mirrors Arena.RIVALRY_THRESHOLD. */
+const ARENA_RIVALRY_THRESHOLD = 3;
 import { revertReason } from "../chain/chain.js";
 
 const accountProxyAbi = parseAbi(["function initialize(address implementation)"]);
@@ -45,8 +48,9 @@ export class WorldController {
   @Get("health")
   async health() {
     const head = Number(await this.ctx.chain.publicClient.getBlockNumber());
-    const indexedTo = await this.ctx.indexer.cursor();
-    return { ok: true, chainId: this.ctx.chain.chain.id, head, indexedTo, lag: head - indexedTo, llm: this.ctx.llmEnabled };
+    // The cursor is the next block to index, so everything below it is done.
+    const indexedTo = (await this.ctx.indexer.cursor()) - 1;
+    return { ok: true, chainId: this.ctx.chain.chain.id, head, indexedTo, lag: Math.max(0, head - indexedTo), llm: this.ctx.llmEnabled };
   }
 
   @Get("config")
@@ -312,6 +316,44 @@ export class ArenaController {
     const n = Math.min(Math.max(Number(limit ?? 30) || 30, 1), 100);
     const rows = await this.ctx.dbHandle.db.select().from(battles).orderBy(desc(battles.startBlock)).limit(n);
     return this.withTokens(rows);
+  }
+
+  /** Pairs that keep meeting in the Arena, most fights first. Built from the last 1,000 resolved battles. */
+  @Get("rivalries")
+  async rivalries(@Query("limit") limit?: string) {
+    const n = Math.min(Math.max(Number(limit ?? 12) || 12, 1), 50);
+    const rows = await this.ctx.dbHandle.db
+      .select()
+      .from(battles)
+      .where(eq(battles.status, "resolved"))
+      .orderBy(desc(battles.startBlock))
+      .limit(1_000);
+    const pairs = new Map<string, { a: string; b: string; fights: number; winsA: number; winsB: number; lastBattleId: string }>();
+    for (const r of rows) {
+      const [a, b] = r.attKey < r.defKey ? [r.attKey, r.defKey] : [r.defKey, r.attKey];
+      const key = `${a}:${b}`;
+      const p = pairs.get(key) ?? { a, b, fights: 0, winsA: 0, winsB: 0, lastBattleId: r.battleId };
+      p.fights += 1;
+      const winner = r.attackerWon ? r.attKey : r.defKey;
+      if (winner === a) p.winsA += 1;
+      else p.winsB += 1;
+      pairs.set(key, p);
+    }
+    const top = [...pairs.values()].filter((p) => p.fights >= 2).sort((x, y) => y.fights - x.fights).slice(0, n);
+    const keys = [...new Set(top.flatMap((p) => [p.a, p.b]))];
+    const known = keys.length
+      ? await this.ctx.dbHandle.db.select({ key: chogs.key, tokenId: chogs.tokenId, nickname: chogs.nickname }).from(chogs).where(inArray(chogs.key, keys))
+      : [];
+    const byKey = new Map(known.map((k) => [k.key, k]));
+    return top.map((p) => ({
+      a: byKey.get(p.a) ?? null,
+      b: byKey.get(p.b) ?? null,
+      fights: p.fights,
+      winsA: p.winsA,
+      winsB: p.winsB,
+      rivals: p.fights >= ARENA_RIVALRY_THRESHOLD,
+      lastBattleId: p.lastBattleId,
+    }));
   }
 
   @Get("battles/:id")
