@@ -47,14 +47,35 @@ export class HeuristicDecider implements Decider {
 export function heuristic(ctx: DecisionContext, candidates: Candidate[], fallbackReason?: string): Decision {
   const best = rank(candidates)[0];
   if (!best) throw new Error("no candidates (rest is always present)");
-  const goals = goalNames(ctx.goalMask);
-  const why = goals.length ? `it serves my goal to ${goals[0]!.toLowerCase()}` : "it is the best value right now";
+  const goal = servedGoal(best, ctx.goalMask);
+  const why = goal ? `it serves my goal to ${GOAL_LABELS[goal].toLowerCase()}` : "it is the best value right now";
   return {
     candidate: best,
     thought: best.kind === "rest" ? "Nothing worth the risk right now. Resting." : `${best.label}: ${why}.`,
     decidedBy: "heuristic",
     ...(fallbackReason ? { fallbackReason } : {}),
   };
+}
+
+/** Which of the owner's goals a candidate serves best, for the heuristic's explanation. */
+export function servedGoal(c: Candidate, goalMask: number): GoalKey | undefined {
+  let order: GoalKey[];
+  switch (c.kind) {
+    case "quest":
+      order =
+        c.facts.type === "explore" ? ["EXPLORE", "MONEY"] : c.facts.type === "train" ? ["STRONGEST"] : ["MONEY", "STRONGEST", "REPUTATION"];
+      break;
+    case "attack":
+      order = ["REPUTATION", "STRONGEST", "MONEY"];
+      break;
+    case "buy":
+    case "use":
+      order = ["STRONGEST"];
+      break;
+    default:
+      order = [];
+  }
+  return order.find((g) => (goalMask & Goal[g]) !== 0);
 }
 
 /**

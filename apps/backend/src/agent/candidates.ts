@@ -233,7 +233,7 @@ function questCandidate(
     kind: "quest",
     questId: q.id,
     cost: q.fee,
-    label: `${q.name} in ${zone.name}`,
+    label: q.kind === "EXPLORE" ? q.name : `${q.name} in ${zone.name}`,
     score,
     facts: {
       type: q.kind.toLowerCase(),

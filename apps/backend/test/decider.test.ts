@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it } from "vitest";
-import { ClaudeDecider, describe as describeSituation, heuristic, MAX_OPTIONS, type DecisionContext } from "../src/agent/decider.js";
+import { ClaudeDecider, describe as describeSituation, heuristic, MAX_OPTIONS, servedGoal, type DecisionContext } from "../src/agent/decider.js";
 import type { Candidate } from "../src/agent/candidates.js";
 
 const ctx: DecisionContext = {
@@ -85,5 +85,14 @@ describe("ClaudeDecider", () => {
 
   it("heuristic picks the highest score", () => {
     expect(heuristic(ctx, cands).candidate.id).toBe("quest-0");
+  });
+
+  it("heuristic explains with the goal the action serves", () => {
+    const explore: Candidate = { id: "quest-3", kind: "quest", questId: 3, cost: 2n, label: "Explore Purple Meadows", score: 9, facts: { type: "explore" } };
+    // Money is listed first in the mask, but exploring serves the explore goal.
+    const r = heuristic({ ...ctx, goalMask: 2 | 4 }, [explore]);
+    expect(r.thought).toContain("explore the world");
+    expect(servedGoal(explore, 2)).toBe("MONEY");
+    expect(servedGoal(explore, 0)).toBeUndefined();
   });
 });
