@@ -186,6 +186,8 @@ export const api = {
   chogBattles: (tokenId: string) => request<Omit<Battle, "attacker" | "defender">[]>(`/chogs/${tokenId}/battles`),
   createAccount: (tokenId: string) =>
     request<{ account: Address; created: boolean; txHashes?: Hex[] }>(`/chogs/${tokenId}/account`, { method: "POST" }),
+  setProfile: (tokenId: string, body: { nickname: string | null; personality: string | null; issuedAt: string; signature: Hex }) =>
+    request<{ nickname: string | null; personality: string | null }>(`/chogs/${tokenId}/profile`, { method: "PUT", body: JSON.stringify(body) }),
   nudge: (tokenId: string) => request<{ queued: boolean }>(`/chogs/${tokenId}/nudge`, { method: "POST" }),
 };
 

@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { useAccount } from "wagmi";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { levelForXp, xpThreshold, TITLE_LABELS, GOAL_LABELS, Goal, type GoalKey } from "@chog-world/shared";
+import { levelForXp, xpThreshold, TITLE_LABELS, GOAL_LABELS, Goal, type Deployment, type GoalKey } from "@chog-world/shared";
 import { api, ApiError, type ChogView } from "@/lib/api";
 import { chog as fmtChog, shortAddress, untilLabel } from "@/lib/format";
 import { explorerAddress } from "@/lib/config";
@@ -14,6 +14,7 @@ import { ChogImage } from "@/components/ChogImage";
 import { ElementBadge, StatBars, dnaFor } from "@/components/Stats";
 import { FeedItem } from "@/components/Feed";
 import { AwakenWizard } from "@/components/AwakenWizard";
+import { OwnerPanel } from "@/components/OwnerPanel";
 
 export default function ChogPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,7 +32,8 @@ export default function ChogPage() {
 
   if (!valid) return <Missing text="That is not a Chog number." />;
   if (chog.isLoading || config.isLoading) return <PageSkeleton />;
-  if (chog.error) {
+  // A failed background refresh keeps the last good data on screen; only a first load can fail the page.
+  if (chog.error && !chog.data) {
     const e = chog.error as Error;
     return <Missing text={e instanceof ApiError && e.status === 404 ? `Chog #${id} does not exist.` : e.message} />;
   }
@@ -57,7 +59,7 @@ export default function ChogPage() {
           <AwakenWizard chog={c} deployment={config.data.deployment} />
         </div>
       ) : (
-        <ChogHome chog={c} collection={config.data.deployment.collection} isOwner={isOwner} justAwoke={wizardShown.current} />
+        <ChogHome chog={c} deployment={config.data.deployment} isOwner={isOwner} justAwoke={wizardShown.current} />
       )}
     </div>
   );
@@ -68,10 +70,10 @@ function IdentityCard({ chog, collection }: { chog: ChogView; collection: `0x${s
   const accent = `hsl(${hue} 80% 58%)`;
   return (
     <aside className="sticker h-fit overflow-hidden bg-night-2" style={{ ["--chog" as string]: accent }}>
-      <ChogImage tokenId={chog.tokenId} size={512} version={chog.character.xp} />
+      <ChogImage tokenId={chog.tokenId} size={512} version={`${chog.character.xp}-${chog.profile?.nickname ?? ""}`} />
       <div className="space-y-3 border-t-[3px] border-ink p-5">
         <div className="flex items-center justify-between">
-          <h1 className="font-display text-3xl">Chog #{chog.tokenId}</h1>
+          <h1 className="font-display text-3xl">{chog.profile?.nickname ?? `Chog #${chog.tokenId}`}</h1>
           <ElementBadge element={stats.element} />
         </div>
         <p className="text-sm text-muted">Born with these stats. Everything after this is earned.</p>
@@ -81,7 +83,8 @@ function IdentityCard({ chog, collection }: { chog: ChogView; collection: `0x${s
   );
 }
 
-function ChogHome({ chog: c, collection, isOwner, justAwoke }: { chog: ChogView; collection: `0x${string}`; isOwner: boolean; justAwoke: boolean }) {
+function ChogHome({ chog: c, deployment, isOwner, justAwoke }: { chog: ChogView; deployment: Deployment; isOwner: boolean; justAwoke: boolean }) {
+  const collection = deployment.collection;
   const { stats: base, hue } = dnaFor(collection, c.tokenId);
   const accent = `hsl(${hue} 80% 58%)`;
   const journal = useLiveJournal(c.tokenId);
@@ -106,7 +109,7 @@ function ChogHome({ chog: c, collection, isOwner, justAwoke }: { chog: ChogView;
     <div className="grid gap-8 lg:grid-cols-[minmax(0,420px)_1fr]" style={{ ["--chog" as string]: accent }}>
       <aside className="space-y-6">
         <div className="sticker overflow-hidden bg-night-2">
-          <ChogImage tokenId={c.tokenId} size={512} version={`${c.character.xp}-${c.character.scars}-${c.character.titles}-${injured}`} />
+          <ChogImage tokenId={c.tokenId} size={512} version={`${c.character.xp}-${c.character.scars}-${c.character.titles}-${injured}-${c.profile?.nickname ?? ""}`} />
           <div className="space-y-4 border-t-[3px] border-ink p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -171,6 +174,8 @@ function ChogHome({ chog: c, collection, isOwner, justAwoke }: { chog: ChogView;
         )}
 
         <AgentStatus chog={c} injured={injured} buffed={buffed} goals={goals.map((g) => GOAL_LABELS[g])} isOwner={isOwner} />
+
+        {isOwner && <OwnerPanel chog={c} deployment={deployment} />}
 
         <div className="sticker bg-night-2 px-5 pb-2 pt-5">
           <div className="flex items-center justify-between">
