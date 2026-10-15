@@ -4,8 +4,34 @@
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@chog-world/web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@chog-world/web",
+        "dev"
+      ],
       "port": 3100
+    },
+    {
+      "name": "web-testnet",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NEXT_PUBLIC_API_URL=http://localhost:9101",
+        "NEXT_PUBLIC_CHAIN_ID=10143",
+        "NEXT_PUBLIC_RPC_URL=",
+        "NEXT_PUBLIC_DEV_WALLET=false",
+        "NEXT_DIST_DIR=.next-testnet",
+        "pnpm",
+        "--dir",
+        "/Users/mac/codes/chog-world",
+        "--filter",
+        "@chog-world/web",
+        "exec",
+        "next",
+        "dev",
+        "-p",
+        "3101"
+      ],
+      "port": 3101
     }
   ]
 }
