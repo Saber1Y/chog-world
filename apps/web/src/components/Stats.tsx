@@ -52,9 +52,9 @@ export function ElementBadge({ element }: { element: number }) {
     <span
       className="inline-flex items-center gap-1.5 rounded-full border-2 border-ink px-2.5 py-0.5 text-xs font-bold text-ink"
       style={{ background: e.color }}
-      title={`${e.name} beats ${e.beats}`}
+      title={`${e.name} element: born with it, strong against ${e.beats}`}
     >
-      {e.name}
+      {e.name} element
     </span>
   );
 }

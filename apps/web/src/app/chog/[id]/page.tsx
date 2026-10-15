@@ -16,7 +16,7 @@ import { FeedItem } from "@/components/Feed";
 import { AwakenWizard } from "@/components/AwakenWizard";
 import { OwnerPanel } from "@/components/OwnerPanel";
 import { AwayDigest } from "@/components/AwayDigest";
-import { gasTank, mon, type GasTank } from "@/lib/gas";
+import { CHEAPEST_FEE, gasTank, isFunded, mon, type GasTank } from "@/lib/gas";
 import { ChogBattles } from "@/components/ChogBattles";
 
 export default function ChogPage() {
@@ -45,7 +45,9 @@ export default function ChogPage() {
   const c = chog.data;
   const isOwner = !!address && c.owner.toLowerCase() === address.toLowerCase();
   const enrolledByOwner = c.policy.active && c.policy.owner.toLowerCase() === c.owner.toLowerCase();
-  const needsAwakening = !c.accountDeployed || !enrolledByOwner || BigInt(c.balance) === 0n;
+  // Until a Chog has played at all, funding is part of awakening; after that, running low shows on its home.
+  const hasPlayed = c.character.quests > 0 || c.character.wins + c.character.losses > 0;
+  const needsAwakening = !c.accountDeployed || !enrolledByOwner || (!hasPlayed && !isFunded(c));
   const showWizard = isOwner && needsAwakening;
   if (showWizard) wizardShown.current = true;
 
@@ -212,11 +214,15 @@ function statusHeadline(c: ChogView, reason: string, tank: GasTank, injured: boo
   if (reason === "owner changed") return "Changed hands: its agent stood down";
   if (reason === "paused") return "Paused by its owner";
   if (reason) return `Not acting: ${reason}`;
-  if (tank.empty) return "Resting: out of MON for gas";
-  if (tank.overLimit) return "Resting: gas costs more than its owner allowed";
-  if (injured) return `Recovering for ${untilLabel(c.character.injuredUntil)}`;
+  // Something already in flight matters more than whether it can afford the next move.
   if (c.activeRunId !== "0") return "Out on a quest";
   if (c.pendingBattleId !== "0") return "Fighting in the Arena";
+  if (tank.empty) return "Resting: out of MON for gas";
+  if (tank.overLimit) return "Resting: gas costs more than its owner allowed";
+  if (BigInt(c.balance) < CHEAPEST_FEE) return "Resting: no CHOG left for fees";
+  if (c.policy.actionsLeft <= 0) return "Done for today: all moves made";
+  if (BigInt(c.policy.remaining) < CHEAPEST_FEE) return "Done for today: budget spent";
+  if (injured) return `Recovering for ${untilLabel(c.character.injuredUntil)}`;
   if (nextTick && nextTick > Date.now() / 1000) return `Planning its next move (${untilLabel(nextTick)})`;
   return "Deciding what to do";
 }
@@ -237,6 +243,9 @@ function AgentStatus({ chog: c, injured, buffed, goals, isOwner }: { chog: ChogV
         <p className="text-xs font-bold uppercase tracking-wider text-muted">Right now</p>
         <p className="mt-1 font-display text-2xl">{headline}</p>
         {c.agent?.lastTickNote && !reason && <p className="mt-1 text-sm text-muted">Last move: {c.agent.lastTickNote}</p>}
+        {isOwner && !reason && BigInt(c.balance) < CHEAPEST_FEE && (
+          <p className="mt-1 text-sm font-bold text-gold">Send it CHOG in Your controls → Wallet to get it moving again.</p>
+        )}
         {buffed && <p className="mt-2 inline-block rounded-full bg-monad/25 px-2 py-0.5 text-xs font-bold text-monad">+50% XP active</p>}
         {goals.length > 0 && (
           <p className="mt-3 text-sm">

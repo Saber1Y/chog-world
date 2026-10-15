@@ -1,4 +1,5 @@
 import { formatEther } from "viem";
+import { QUESTS } from "@chog-world/shared";
 import type { ChogView } from "./api";
 
 /** MON amounts with up to 3 decimals, for gas tanks and fees. */
@@ -41,4 +42,13 @@ export function gasTank(c: Pick<ChogView, "gas" | "policy">): GasTank {
     empty: paid.length > 0 && balance < minFee,
     overLimit: paid.length > 0 && maxFee > BigInt(c.policy.maxGasFee),
   };
+}
+
+/** The cheapest quest entry fee: below this a Chog cannot afford any move that costs CHOG. */
+export const CHEAPEST_FEE = QUESTS.reduce((m, q) => (q.fee < m ? q.fee : m), QUESTS[0]!.fee);
+
+/** Funded enough to start playing: some CHOG for fees and, when the world charges gas, a full move of MON. */
+export function isFunded(c: Pick<ChogView, "gas" | "policy" | "balance">): boolean {
+  const tank = gasTank(c);
+  return BigInt(c.balance) > 0n && (!tank.charges || tank.balance >= tank.maxFee);
 }
