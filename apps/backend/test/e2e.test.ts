@@ -16,7 +16,7 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import { accountV3Abi, chogOperatorAbi, chogStateAbi, EXTERNAL, monadTestnet, POLICY_PRESETS, simulate, Goal, type Stats } from "@chog-world/shared";
+import { accountV3Abi, chogOperatorAbi, chogStateAbi, EXTERNAL, monadTestnet, policyParams, simulate, Goal, type Stats } from "@chog-world/shared";
 import { loadEnv } from "../src/config/env.js";
 import { buildContext, type AppContext } from "../src/app/context.js";
 import { actions, battles, chogs, questRuns } from "../src/database/schema.js";
@@ -59,13 +59,17 @@ async function freePort(): Promise<number> {
   });
 }
 
+const MON = 10n ** 18n;
+const GAS_TANK = MON;
+const GAS_FEES = [MON / 20n, MON / 10n, MON / 50n, MON / 50n]; // quest, attack, buy, use
+
 describe("M1: autonomous loop end to end on a Monad testnet fork", () => {
   let anvil: ChildProcess;
   let rpc: string;
   let ctx: AppContext;
   let dataDir: string;
   let deploymentFile: string;
-  let d: { collection: Address; chogToken: Address; operator: Address; state: Address };
+  let d: { collection: Address; chogToken: Address; operator: Address; state: Address; startBlock: number };
   const test = () => createTestClient({ chain: { ...monadTestnet, rpcUrls: { default: { http: [rpc] } } }, mode: "anvil", transport: http(rpc) }).extend(publicActions);
   const walletOf = (account: Address) => createWalletClient({ chain: { ...monadTestnet, rpcUrls: { default: { http: [rpc] } } }, transport: http(rpc), account });
 
@@ -89,14 +93,10 @@ describe("M1: autonomous loop end to end on a Monad testnet fork", () => {
     ]);
     await write(owner, account, proxyAbi, "initialize", [EXTERNAL.tokenboundAccountV3]);
     await write(owner, account, accountV3Abi as Abi, "setPermissions", [[d.operator], [true]]);
-    const p = POLICY_PRESETS.BALANCED;
-    await write(owner, d.operator, chogOperatorAbi as Abi, "enroll", [
-      d.collection,
-      tokenId,
-      { expiry: 0n, actionMask: 0x0f, maxActionsPerDay: p.maxActionsPerDay, maxPerAction: p.maxPerAction, dailyCap: p.dailyCap },
-      Goal.MONEY | Goal.STRONGEST,
-    ]);
+    await write(owner, d.operator, chogOperatorAbi as Abi, "enroll", [d.collection, tokenId, policyParams("BALANCED"), Goal.MONEY | Goal.STRONGEST]);
     await write(ADMIN, d.chogToken, devTokenAbi, "mint", [account, fundChog]);
+    // The owner also fills the Chog's gas tank: each move repays the keeper from it.
+    await t.setBalance({ address: account, value: GAS_TANK });
     return account;
   }
 
@@ -113,6 +113,10 @@ describe("M1: autonomous loop end to end on a Monad testnet fork", () => {
       }
     }
 
+    // Anvil's public development keys are EIP-7702-delegated to sweeper contracts on the live testnet;
+    // clear that code on the fork so the keeper is a plain account, as a real keeper is.
+    await test().setCode({ address: KEEPER, bytecode: "0x" });
+
     deploymentFile = `local-e2e-${port}.json`;
     execFileSync(
       "forge",
@@ -121,6 +125,9 @@ describe("M1: autonomous loop end to end on a Monad testnet fork", () => {
     );
     const deploymentPath = join(CONTRACTS, "deployments", deploymentFile);
     d = JSON.parse(readFileSync(deploymentPath, "utf8"));
+
+    // The world charges a gas fee per move, paid to the keeper from each Chog's own account.
+    for (const [kind, fee] of GAS_FEES.entries()) await write(ADMIN, d.operator, chogOperatorAbi as Abi, "setGasFee", [kind, fee]);
 
     await write(ALICE, d.collection, devChogAbi, "mint", [ALICE]); // #1
     await write(BOB, d.collection, devChogAbi, "mint", [BOB]); // #2
@@ -170,6 +177,15 @@ describe("M1: autonomous loop end to end on a Monad testnet fork", () => {
     expect(executed.length).toBeGreaterThan(0);
     for (const a of executed) expect(a.txHash).toMatch(/^0x[0-9a-f]{64}$/);
 
+    // Every executed move repaid the keeper from the Chog's own account.
+    const paid = await test().getContractEvents({ address: d.operator, abi: chogOperatorAbi, eventName: "GasFeePaid", fromBlock: BigInt(d.startBlock) });
+    expect(paid).toHaveLength(executed.length);
+    for (const e of paid) expect(e.args.keeper?.toLowerCase()).toBe(KEEPER.toLowerCase());
+    const owed = paid.reduce((sum, e) => sum + (e.args.amount ?? 0n), 0n);
+    expect(await ctx.gasFees.owed()).toBe(owed);
+    expect(await ctx.gasFees.run(true)).toBe(owed);
+    expect(await ctx.gasFees.owed()).toBe(0n);
+
     await ctx.indexer.run();
     await test().mine({ blocks: 3 });
     expect(await ctx.resolver.run()).toBeGreaterThan(0);
@@ -210,6 +226,23 @@ describe("M1: autonomous loop end to end on a Monad testnet fork", () => {
     const s = await ctx.reader.snapshot(1n);
     expect(s.policy.dailyCap - s.policy.remaining).toBeLessThanOrEqual(s.policy.dailyCap);
     expect(s.policy.actionsToday).toBeLessThanOrEqual(s.policy.maxActionsPerDay);
+  });
+
+  it("a Chog with an empty gas tank rests instead of sending a transaction", async () => {
+    // Settle anything in flight so Bob's next tick is a fresh decision.
+    await test().mine({ blocks: 3 });
+    await ctx.resolver.run();
+    await ctx.indexer.run();
+    const account = await ctx.reader.accountOf(2n);
+    await test().setBalance({ address: account, value: 0n });
+    const keeperNonce = await test().getTransactionCount({ address: KEEPER });
+
+    const r = await ctx.agent.tick(2n);
+
+    expect(r).toMatchObject({ status: "rested", note: "rested" });
+    expect(await test().getTransactionCount({ address: KEEPER })).toBe(keeperNonce);
+    const latest = (await ctx.journal.list(await ctx.reader.keyOf(2n), { limit: 1 }))[0];
+    expect(latest?.title).toContain("out of MON for gas");
   });
 
   it("selling the Chog stops the agent, and its assets stay with the Chog", async () => {
