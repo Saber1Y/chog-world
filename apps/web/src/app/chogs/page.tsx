@@ -3,15 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useQuery } from "@tanstack/react-query";
 import { api, type OwnedChog } from "@/lib/api";
 import { useWorldConfig } from "@/hooks/useWorld";
-import { isLocalFork } from "@/lib/config";
+import { isLocalFork, isTestnet } from "@/lib/config";
+import { useTx } from "@/hooks/useTx";
+import { TxStatus } from "@/components/TxStatus";
 import { ChogImage } from "@/components/ChogImage";
 import { ElementBadge, StatBars, dnaFor } from "@/components/Stats";
-import type { Address } from "viem";
+import { parseAbi, type Address } from "viem";
+
+const devChogAbi = parseAbi(["function mint(address to) returns (uint256)"]);
 
 export default function MyChogs() {
   const { address, isConnected } = useAccount();
@@ -33,6 +37,7 @@ export default function MyChogs() {
           <p className="font-display text-3xl">Connect to find your Chogs</p>
           <p className="max-w-md text-muted">We look up which Chogs your wallet owns. Nothing is signed until you choose to awaken one.</p>
           <ConnectButton />
+          {isTestnet && <p className="text-sm text-muted">No Chog yet? On testnet you can mint a free test Chog once connected.</p>}
         </div>
       )}
 
@@ -54,15 +59,27 @@ export default function MyChogs() {
               ? "This is a local practice copy of the chain, so Chogs you own on real testnet don't appear here."
               : "Ownership refreshes every few minutes, so a Chog you just bought may take a moment to show up. You can also open one by its number above."}
           </p>
+          {isTestnet && config.data && (
+            <div className="mt-6">
+              <MintTestChog collection={config.data.deployment.collection} />
+            </div>
+          )}
         </div>
       )}
 
       {owned.data && owned.data.length > 0 && config.data && (
-        <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {owned.data.map((c) => (
-            <ChogCard key={c.tokenId} chog={c} collection={config.data.deployment.collection} />
-          ))}
-        </ul>
+        <>
+          <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {owned.data.map((c) => (
+              <ChogCard key={c.tokenId} chog={c} collection={config.data.deployment.collection} />
+            ))}
+          </ul>
+          {isTestnet && (
+            <div className="flex justify-center">
+              <MintTestChog collection={config.data.deployment.collection} subtle />
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -88,6 +105,43 @@ function ChogCard({ chog, collection }: { chog: OwnedChog; collection: Address }
         </Link>
       </div>
     </li>
+  );
+}
+
+/** Testnet only: the dev collection lets anyone mint, so visitors without a Chog can still play. */
+function MintTestChog({ collection, subtle = false }: { collection: Address; subtle?: boolean }) {
+  const router = useRouter();
+  const { address } = useAccount();
+  const client = usePublicClient();
+  const { writeContractAsync } = useWriteContract();
+  const tx = useTx();
+  const busy = tx.state.status === "signing" || tx.state.status === "pending" || tx.state.status === "done";
+
+  async function mint() {
+    if (!address || !client) return;
+    // The call returns the new id; simulating first tells us which one we are about to get.
+    let id: bigint | undefined;
+    const ok = await tx.run(async () => {
+      const { request, result } = await client.simulateContract({ address: collection, abi: devChogAbi, functionName: "mint", args: [address], account: address });
+      id = result;
+      return writeContractAsync(request);
+    });
+    if (ok && id !== undefined) router.push(`/chog/${id}`);
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <button
+        type="button"
+        onClick={mint}
+        disabled={busy}
+        className={`sticker press px-5 py-2.5 font-display text-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:transform-none ${subtle ? "bg-night-3" : "bg-gold text-ink"}`}
+      >
+        {busy ? "Minting…" : subtle ? "Mint another test Chog" : "Mint a free test Chog"}
+      </button>
+      <p className="text-xs text-muted">Testnet only. It costs a little test MON for gas.</p>
+      <TxStatus state={tx.state} />
+    </div>
   );
 }
 
