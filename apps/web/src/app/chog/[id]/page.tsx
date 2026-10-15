@@ -16,6 +16,7 @@ import { FeedItem } from "@/components/Feed";
 import { AwakenWizard } from "@/components/AwakenWizard";
 import { OwnerPanel } from "@/components/OwnerPanel";
 import { AwayDigest } from "@/components/AwayDigest";
+import { gasTank, mon, type GasTank } from "@/lib/gas";
 import { ChogBattles } from "@/components/ChogBattles";
 
 export default function ChogPage() {
@@ -205,30 +206,30 @@ function ChogHome({ chog: c, deployment, isOwner, justAwoke }: { chog: ChogView;
   );
 }
 
+/** One line saying what the Chog is doing right now, most important reason first. */
+function statusHeadline(c: ChogView, reason: string, tank: GasTank, injured: boolean, nextTick: number | null): string {
+  if (!c.character.awakened) return "Asleep";
+  if (reason === "owner changed") return "Changed hands: its agent stood down";
+  if (reason === "paused") return "Paused by its owner";
+  if (reason) return `Not acting: ${reason}`;
+  if (tank.empty) return "Resting: out of MON for gas";
+  if (tank.overLimit) return "Resting: gas costs more than its owner allowed";
+  if (injured) return `Recovering for ${untilLabel(c.character.injuredUntil)}`;
+  if (c.activeRunId !== "0") return "Out on a quest";
+  if (c.pendingBattleId !== "0") return "Fighting in the Arena";
+  if (nextTick && nextTick > Date.now() / 1000) return `Planning its next move (${untilLabel(nextTick)})`;
+  return "Deciding what to do";
+}
+
 function AgentStatus({ chog: c, injured, buffed, goals, isOwner }: { chog: ChogView; injured: boolean; buffed: boolean; goals: string[]; isOwner: boolean }) {
   const reason = c.inactiveReason;
   const spent = BigInt(c.policy.dailyCap) - BigInt(c.policy.remaining);
   const pctBudget = BigInt(c.policy.dailyCap) > 0n ? Number((spent * 100n) / BigInt(c.policy.dailyCap)) : 0;
   const nextTick = c.agent?.nextTickAt ? new Date(c.agent.nextTickAt).getTime() / 1000 : null;
   const accountUrl = explorerAddress(c.account);
+  const tank = gasTank(c);
 
-  const headline = !c.character.awakened
-    ? "Asleep"
-    : reason
-      ? reason === "owner changed"
-        ? "Changed hands: its agent stood down"
-        : reason === "paused"
-          ? "Paused by its owner"
-          : `Not acting: ${reason}`
-      : injured
-        ? `Recovering for ${untilLabel(c.character.injuredUntil)}`
-        : c.activeRunId !== "0"
-          ? "Out on a quest"
-          : c.pendingBattleId !== "0"
-            ? "Fighting in the Arena"
-            : nextTick && nextTick > Date.now() / 1000
-              ? `Planning its next move (${untilLabel(nextTick)})`
-              : "Deciding what to do";
+  const headline = statusHeadline(c, reason, tank, injured, nextTick);
 
   return (
     <div className="sticker grid gap-5 bg-night-2 p-5 sm:grid-cols-2">
@@ -260,6 +261,12 @@ function AgentStatus({ chog: c, injured, buffed, goals, isOwner }: { chog: ChogV
             <div className={`h-full ${pctBudget > 85 ? "bg-danger" : "bg-gold"}`} style={{ width: `${pctBudget}%` }} />
           </div>
         </div>
+        {tank.charges && (
+          <p className={`text-xs ${tank.empty ? "font-bold text-danger" : "text-muted"}`}>
+            Gas tank: {mon(tank.balance)} MON
+            {tank.empty ? (isOwner ? " · top it up in Your controls → Wallet" : " · waiting for its owner") : ` · about ${tank.moves} quests`}
+          </p>
+        )}
         <p className="text-xs text-muted">
           Earned so far: <span className="text-paper">{fmtChog(c.earned)} CHOG</span> · Owner{" "}
           <span className="font-mono">{shortAddress(c.owner)}</span>
