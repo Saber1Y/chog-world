@@ -44,17 +44,26 @@ export default function Home() {
 
         <div className="relative mx-auto h-[360px] w-full max-w-md sm:h-[420px]" aria-label="Evolved Chogs">
           {[0, 1, 2].map((i) => {
-            const s = stars[i];
+            // The top Chog takes the raised centre card, the runners-up flank it.
+            const s = stars[[1, 0, 2][i]!];
             const pos = ["left-0 top-10 -rotate-6", "left-1/2 top-0 z-10 -translate-x-1/2 rotate-1", "right-0 top-16 rotate-6"][i];
+            const open = !s && top.isSuccess;
             return (
               <div key={i} className={`absolute w-[58%] ${pos} ${i === 1 ? "animate-float" : ""}`}>
-                <div className="sticker overflow-hidden bg-night-2">
-                  {s ? <ChogImage tokenId={s.tokenId} size={384} /> : <div className="aspect-square animate-pulse bg-night-3" />}
-                  <div className="flex items-center justify-between border-t-[3px] border-ink px-3 py-2 text-sm">
-                    <span className="font-bold">{s ? (s.nickname ?? `#${s.tokenId}`) : "…"}</span>
-                    {s && <span className="font-display text-gold">LV {s.level}</span>}
+                {open ? (
+                  <Link href="/chogs" className="sticker press block overflow-hidden bg-night-2">
+                    <div className="grid aspect-square place-items-center bg-night-3 font-display text-7xl text-muted/50">?</div>
+                    <div className="border-t-[3px] border-ink px-3 py-2 text-sm font-bold text-gold">Your Chog here</div>
+                  </Link>
+                ) : (
+                  <div className="sticker overflow-hidden bg-night-2">
+                    {s ? <ChogImage tokenId={s.tokenId} size={384} /> : <div className="aspect-square animate-pulse bg-night-3" />}
+                    <div className="flex items-center justify-between border-t-[3px] border-ink px-3 py-2 text-sm">
+                      <span className="font-bold">{s ? (s.nickname ?? `#${s.tokenId}`) : "…"}</span>
+                      {s && <span className="font-display text-gold">LV {s.level}</span>}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             );
           })}
