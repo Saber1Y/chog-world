@@ -42,6 +42,23 @@ describe("OpenAICompatibleModel", () => {
     await expect(m.json(req)).resolves.toEqual({ candidateId: "rest", thought: "Nap." });
   });
 
+  it("finds the JSON object in a reply that wraps it in prose", async () => {
+    const m = model(async () => reply('Sure! Here is my choice: {"candidateId":"quest-0","thought":"Slime time."} Hope that helps.'));
+    await expect(m.json(req)).resolves.toEqual({ candidateId: "quest-0", thought: "Slime time." });
+  });
+
+  it("adds provider routing fields only to structured requests", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const m = new OpenAICompatibleModel("openrouter", "https://example.test", "k", "openrouter/free", 1_000, {}, (async (_u: string, i: RequestInit) => {
+      bodies.push(JSON.parse(i.body as string));
+      return reply('{"candidateId":"rest","thought":"Nap."}');
+    }) as typeof fetch, { provider: { require_parameters: true } });
+    await m.json(req);
+    await m.text(req);
+    expect(bodies[0]!.provider).toEqual({ require_parameters: true });
+    expect(bodies[1]!.provider).toBeUndefined();
+  });
+
   it("turns every failure into a short, key-free reason", async () => {
     const cases: [() => Promise<Response>, string][] = [
       [async () => new Response("slow down", { status: 429 }), "rate limited"],

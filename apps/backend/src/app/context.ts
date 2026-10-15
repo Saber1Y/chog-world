@@ -45,9 +45,17 @@ export function buildModels(env: Env): TextModel[] {
       models.push(new OpenAICompatibleModel("gemini", env.GEMINI_BASE_URL, env.GEMINI_API_KEY, env.GEMINI_MODEL, t));
     } else if (id === "openrouter" && env.OPENROUTER_API_KEY) {
       models.push(
-        new OpenAICompatibleModel("openrouter", env.OPENROUTER_BASE_URL, env.OPENROUTER_API_KEY, env.OPENROUTER_MODEL, t, {
-          "X-Title": "CHOG World",
-        }),
+        new OpenAICompatibleModel(
+          "openrouter",
+          env.OPENROUTER_BASE_URL,
+          env.OPENROUTER_API_KEY,
+          env.OPENROUTER_MODEL,
+          t,
+          { "X-Title": "CHOG World" },
+          fetch,
+          // openrouter/free routes to any free model; only use ones that honour the JSON schema.
+          { provider: { require_parameters: true } },
+        ),
       );
     } else if (id === "claude" && env.ANTHROPIC_API_KEY) {
       models.push(new AnthropicModel(new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }), env.AGENT_MODEL, t));

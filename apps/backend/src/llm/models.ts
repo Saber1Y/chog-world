@@ -37,10 +37,20 @@ function httpLabel(status: number): string {
   return `error ${status}`;
 }
 
-/** Models sometimes wrap JSON in a code fence even when asked not to. */
-function parseJsonText(text: string): unknown {
+/**
+ * Models sometimes wrap JSON in a code fence or a sentence even when asked not to, so fall back to
+ * the outermost {...} in the reply. The result is still validated against the schema.
+ */
+export function parseJsonText(text: string): unknown {
   const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  return JSON.parse(trimmed);
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start === -1 || end <= start) throw new Error("no JSON object in reply");
+    return JSON.parse(trimmed.slice(start, end + 1));
+  }
 }
 
 /**
@@ -56,6 +66,8 @@ export class OpenAICompatibleModel implements TextModel {
     private readonly timeoutMs: number,
     private readonly headers: Record<string, string> = {},
     private readonly fetchImpl: typeof fetch = fetch,
+    /** Extra request fields sent only with structured-output requests (provider-specific routing). */
+    private readonly jsonExtras: Record<string, unknown> = {},
   ) {}
 
   async text(req: TextRequest): Promise<string> {
@@ -65,10 +77,11 @@ export class OpenAICompatibleModel implements TextModel {
   }
 
   async json<T extends z.ZodType>(req: TextRequest & { schemaName: string; schema: T }): Promise<z.infer<T>> {
-    const content = await this.complete(req, {
-      type: "json_schema",
-      json_schema: { name: req.schemaName, strict: true, schema: z.toJSONSchema(req.schema) },
-    });
+    const content = await this.complete(
+      req,
+      { type: "json_schema", json_schema: { name: req.schemaName, strict: true, schema: z.toJSONSchema(req.schema) } },
+      this.jsonExtras,
+    );
     let raw: unknown;
     try {
       raw = parseJsonText(content);
@@ -80,7 +93,7 @@ export class OpenAICompatibleModel implements TextModel {
     return parsed.data;
   }
 
-  private async complete(req: TextRequest, responseFormat?: unknown): Promise<string> {
+  private async complete(req: TextRequest, responseFormat?: unknown, extras: Record<string, unknown> = {}): Promise<string> {
     let res: Response;
     try {
       res = await this.fetchImpl(`${this.baseUrl.replace(/\/$/, "")}/chat/completions`, {
@@ -94,6 +107,7 @@ export class OpenAICompatibleModel implements TextModel {
             { role: "user", content: req.user },
           ],
           ...(responseFormat ? { response_format: responseFormat } : {}),
+          ...extras,
         }),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
