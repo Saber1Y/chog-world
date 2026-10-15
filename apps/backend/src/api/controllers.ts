@@ -33,6 +33,20 @@ import { screen } from "../security/firewall.js";
 import { json } from "./json.js";
 import { artStateOf, metadataOf } from "../render/state.js";
 
+/** Battles with each side's token id and nickname attached. */
+async function withTokens(ctx: AppContext, rows: (typeof battles.$inferSelect)[]) {
+  const keys = [...new Set(rows.flatMap((r) => [r.attKey, r.defKey]))];
+  const known = keys.length
+    ? await ctx.dbHandle.db.select({ key: chogs.key, tokenId: chogs.tokenId, nickname: chogs.nickname }).from(chogs).where(inArray(chogs.key, keys))
+    : [];
+  const byKey = new Map(known.map((k) => [k.key, k]));
+  return rows.map((r) => ({
+    ...r,
+    attacker: byKey.get(r.attKey) ?? null,
+    defender: byKey.get(r.defKey) ?? null,
+  }));
+}
+
 function tokenIdParam(raw: string): bigint {
   if (!/^\d{1,6}$/.test(raw)) throw new BadRequestException("tokenId must be a positive integer");
   const id = BigInt(raw);
@@ -220,12 +234,13 @@ export class ChogsController {
   @Get(":tokenId/battles")
   async battlesOf(@Param("tokenId") raw: string) {
     const key = await this.ctx.reader.keyOf(tokenIdParam(raw));
-    return this.ctx.dbHandle.db
+    const rows = await this.ctx.dbHandle.db
       .select()
       .from(battles)
       .where(or(eq(battles.attKey, key), eq(battles.defKey, key)))
       .orderBy(desc(battles.startBlock))
       .limit(30);
+    return withTokens(this.ctx, rows);
   }
 
   /** Owner-signed nickname and personality. Screened before it can ever reach the decider prompt. */
@@ -329,7 +344,7 @@ export class ArenaController {
   async recent(@Query("limit") limit?: string) {
     const n = Math.min(Math.max(Number(limit ?? 30) || 30, 1), 100);
     const rows = await this.ctx.dbHandle.db.select().from(battles).orderBy(desc(battles.startBlock)).limit(n);
-    return this.withTokens(rows);
+    return withTokens(this.ctx, rows);
   }
 
   /** Pairs that keep meeting in the Arena, most fights first. Built from the last 1,000 resolved battles. */
@@ -375,19 +390,7 @@ export class ArenaController {
     if (!/^\d+$/.test(id)) throw new BadRequestException("invalid battle id");
     const rows = await this.ctx.dbHandle.db.select().from(battles).where(eq(battles.battleId, id));
     if (!rows[0]) throw new NotFoundException("no such battle");
-    return (await this.withTokens(rows))[0];
+    return (await withTokens(this.ctx, rows))[0];
   }
 
-  private async withTokens(rows: (typeof battles.$inferSelect)[]) {
-    const keys = [...new Set(rows.flatMap((r) => [r.attKey, r.defKey]))];
-    const known = keys.length
-      ? await this.ctx.dbHandle.db.select({ key: chogs.key, tokenId: chogs.tokenId, nickname: chogs.nickname }).from(chogs).where(inArray(chogs.key, keys))
-      : [];
-    const byKey = new Map(known.map((k) => [k.key, k]));
-    return rows.map((r) => ({
-      ...r,
-      attacker: byKey.get(r.attKey) ?? null,
-      defender: byKey.get(r.defKey) ?? null,
-    }));
-  }
 }

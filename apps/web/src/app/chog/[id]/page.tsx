@@ -15,6 +15,7 @@ import { ElementBadge, StatBars, dnaFor } from "@/components/Stats";
 import { FeedItem } from "@/components/Feed";
 import { AwakenWizard } from "@/components/AwakenWizard";
 import { OwnerPanel } from "@/components/OwnerPanel";
+import { ChogBattles } from "@/components/ChogBattles";
 
 export default function ChogPage() {
   const { id } = useParams<{ id: string }>();
@@ -102,7 +103,9 @@ function ChogHome({ chog: c, deployment, isOwner, justAwoke }: { chog: ChogView;
   // Refresh the snapshot whenever the journal says something happened.
   const qc = useQueryClient();
   useEffect(() => {
-    if (journal.lastEvent) void qc.invalidateQueries({ queryKey: ["chog", c.tokenId] });
+    if (!journal.lastEvent) return;
+    void qc.invalidateQueries({ queryKey: ["chog", c.tokenId] });
+    void qc.invalidateQueries({ queryKey: ["chogBattles", c.tokenId] });
   }, [journal.lastEvent, qc, c.tokenId]);
 
   return (
@@ -150,6 +153,8 @@ function ChogHome({ chog: c, deployment, isOwner, justAwoke }: { chog: ChogView;
           <p className="text-xs text-muted">Bright: born with. Faint: earned since.</p>
           <StatBars stats={c.stats} base={base} accent={accent} />
         </div>
+
+        <ChogBattles tokenId={c.tokenId} chogKey={c.key} />
 
         {titles.length > 0 && (
           <div className="sticker bg-night-2 p-5">

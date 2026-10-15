@@ -183,7 +183,7 @@ export const api = {
   battles: (limit = 30) => request<Battle[]>(`/arena/battles?limit=${limit}`),
   battle: (id: string) => request<Battle>(`/arena/battles/${id}`),
   rivalries: () => request<Rivalry[]>("/arena/rivalries"),
-  chogBattles: (tokenId: string) => request<Omit<Battle, "attacker" | "defender">[]>(`/chogs/${tokenId}/battles`),
+  chogBattles: (tokenId: string) => request<Battle[]>(`/chogs/${tokenId}/battles`),
   createAccount: (tokenId: string) =>
     request<{ account: Address; created: boolean; txHashes?: Hex[] }>(`/chogs/${tokenId}/account`, { method: "POST" }),
   setProfile: (tokenId: string, body: { nickname: string | null; personality: string | null; issuedAt: string; signature: Hex }) =>
