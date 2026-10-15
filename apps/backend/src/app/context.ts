@@ -12,6 +12,7 @@ import { Resolver } from "../resolver/resolver.js";
 import { Holders } from "../holders/holders.js";
 import { Executor } from "../agent/executor.js";
 import { Agent } from "../agent/agent.js";
+import { GasFeeCollector } from "../agent/gas-fees.js";
 import { HeuristicDecider, LlmDecider, type Decider } from "../agent/decider.js";
 import { AnthropicModel, ModelChain, OpenAICompatibleModel, type TextModel } from "../llm/models.js";
 import { Renderer } from "../render/render.js";
@@ -28,6 +29,7 @@ export interface AppContext {
   resolver: Resolver;
   holders: Holders;
   agent: Agent;
+  gasFees: GasFeeCollector;
   renderer: Renderer;
   llmEnabled: boolean;
   /** The models in use, in order, for logs and /health; null when the agent runs on the heuristic. */
@@ -79,6 +81,7 @@ export async function buildContext(env: Env, log: (scope: string, msg: string) =
   const resolver = new Resolver(db, chain.publicClient, chain.resolver, chain.deployment, (m) => log("resolver", m));
   const holders = new Holders(db, chain.publicClient, chain.deployment, env.COLLECTION_SUPPLY);
   const executor = new Executor(db, chain.keeper, chain.deployment);
+  const gasFees = new GasFeeCollector(chain.publicClient, chain.keeper, chain.deployment, parseEther(env.GAS_WITHDRAW_MIN), (m) => log("gas", m));
   const agent = new Agent(
     db,
     reader,
@@ -89,7 +92,9 @@ export async function buildContext(env: Env, log: (scope: string, msg: string) =
     { tickMinutes: env.TICK_MINUTES, movesPerDay: env.MOVES_PER_DAY, restMinutes: env.REST_MINUTES, batchSize: 20, scoutCount: 6 },
     (m) => log("agent", m),
     async () => {
-      const balance = await chain.keeperBalance();
+      let balance = await chain.keeperBalance();
+      // Running low: first pull whatever gas fees Chogs have already paid.
+      if (balance < keeperMin && (await gasFees.run(true)) > 0n) balance = await chain.keeperBalance();
       if (balance < keeperMin)
         return { ok: false as const, reason: `keeper balance ${formatEther(balance)} MON is below ${env.KEEPER_MIN_BALANCE} MON; top it up` };
       // The resolver only sees indexed runs and battles, and their seeds expire after 256 blocks:
@@ -102,5 +107,5 @@ export async function buildContext(env: Env, log: (scope: string, msg: string) =
 
   const renderer = new Renderer(env.ART_CACHE_PATH);
 
-  return { env, dbHandle, chain, reader, journal, digests, indexer, resolver, holders, agent, renderer, llmEnabled, llmName };
+  return { env, dbHandle, chain, reader, journal, digests, indexer, resolver, holders, agent, gasFees, renderer, llmEnabled, llmName };
 }

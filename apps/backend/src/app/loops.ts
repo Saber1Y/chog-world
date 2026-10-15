@@ -17,6 +17,7 @@ export class Loops implements OnApplicationBootstrap, OnModuleDestroy {
     this.every("indexer", env.INDEX_INTERVAL_SEC, () => this.ctx.indexer.run());
     this.every("resolver", env.RESOLVE_INTERVAL_SEC, () => this.ctx.resolver.run());
     this.every("holders", env.HOLDERS_INTERVAL_SEC, () => this.ctx.holders.refresh(), true);
+    this.every("gas fees", env.GAS_COLLECT_INTERVAL_SEC, () => this.ctx.gasFees.run(), true);
     if (env.AGENT_ENABLED) this.every("agent", env.SCHEDULER_INTERVAL_SEC, () => this.ctx.agent.sweep());
     else this.log.warn("AGENT_ENABLED=false: Chogs will not act on their own");
   }

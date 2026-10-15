@@ -82,6 +82,12 @@ export const envSchema = z.object({
   /** The agent starts no new moves while the indexer is further behind the head than this. */
   MAX_INDEX_LAG: z.coerce.number().int().min(1).max(200).default(60),
   HOLDERS_INTERVAL_SEC: z.coerce.number().int().min(30).default(300),
+  /** How often the keeper checks for gas fees to withdraw, and the least worth a withdrawal (MON). */
+  GAS_COLLECT_INTERVAL_SEC: z.coerce.number().int().min(30).default(600),
+  GAS_WITHDRAW_MIN: z
+    .string()
+    .regex(/^\d+(\.\d+)?$/, "must be a MON amount like 0.2")
+    .default("0.2"),
 
   RPC_MAX_CONCURRENCY: z.coerce.number().int().min(1).max(100).default(6),
   RPC_MAX_RPS: z.coerce.number().int().min(1).max(1000).default(15),
