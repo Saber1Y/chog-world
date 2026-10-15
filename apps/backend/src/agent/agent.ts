@@ -18,6 +18,9 @@ export interface AgentConfig {
   scoutCount: number;
 }
 
+/** Says whether the keeper can afford new moves; when not, the reason to log. */
+export type SpendGate = () => Promise<{ ok: true } | { ok: false; reason: string }>;
+
 export type TickResult =
   | { tokenId: bigint; status: "skipped"; note: string }
   | { tokenId: bigint; status: "rested" | "executed" | "blocked" | "failed"; note: string };
@@ -39,6 +42,7 @@ export class Agent {
     private readonly d: Deployment,
     private readonly cfg: AgentConfig,
     private readonly log: (msg: string) => void = () => undefined,
+    private readonly gate: SpendGate = async () => ({ ok: true }),
   ) {}
 
   /** Runs every due Chog once. Re-entrant calls while a sweep is in progress are ignored. */
@@ -46,6 +50,11 @@ export class Agent {
     if (this.running) return [];
     this.running = true;
     try {
+      const gate = await this.gate();
+      if (!gate.ok) {
+        this.log(`not starting new moves: ${gate.reason}`);
+        return [];
+      }
       const due = await this.db
         .select()
         .from(chogs)

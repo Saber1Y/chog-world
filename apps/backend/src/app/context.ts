@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { formatEther, parseEther } from "viem";
 import type { Env } from "../config/env.js";
 import { openDatabase, type DbHandle } from "../database/db.js";
 import { ChainService } from "../chain/chain.js";
@@ -49,6 +50,7 @@ export async function buildContext(env: Env, log: (scope: string, msg: string) =
   const decider: Decider = anthropic ? new ClaudeDecider(anthropic, env.AGENT_MODEL, env.AGENT_LLM_TIMEOUT_MS) : new HeuristicDecider();
   const digests = new Digests(db, journal, anthropic ? { client: anthropic, model: env.AGENT_MODEL, timeoutMs: env.AGENT_LLM_TIMEOUT_MS } : null);
 
+  const keeperMin = parseEther(env.KEEPER_MIN_BALANCE);
   const indexer = new Indexer(db, chain.publicClient, chain.deployment, journal, env.LOG_RANGE, (m) => log("indexer", m));
   const resolver = new Resolver(db, chain.publicClient, chain.resolver, chain.deployment, (m) => log("resolver", m));
   const holders = new Holders(db, chain.publicClient, chain.deployment, env.COLLECTION_SUPPLY);
@@ -62,6 +64,12 @@ export async function buildContext(env: Env, log: (scope: string, msg: string) =
     chain.deployment,
     { tickMinutes: env.TICK_MINUTES, batchSize: 20, scoutCount: 6 },
     (m) => log("agent", m),
+    async () => {
+      const balance = await chain.keeperBalance();
+      return balance >= keeperMin
+        ? { ok: true as const }
+        : { ok: false as const, reason: `keeper balance ${formatEther(balance)} MON is below ${env.KEEPER_MIN_BALANCE} MON; top it up` };
+    },
   );
 
   const renderer = new Renderer(env.ART_CACHE_PATH);

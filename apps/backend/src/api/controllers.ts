@@ -18,7 +18,7 @@ import {
 import { createHash } from "node:crypto";
 import type { Response } from "express";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
-import { erc721Abi, isAddress, parseAbi, zeroHash, type Address } from "viem";
+import { erc721Abi, formatEther, isAddress, parseAbi, parseEther, zeroHash, type Address } from "viem";
 import { EXTERNAL, erc6551RegistryAbi, normalizeProfileText, profileMessage, PROFILE_MAX_AGE_MS, NICKNAME_MAX, PERSONALITY_MAX } from "@chog-world/shared";
 
 /** Mirrors Arena.RIVALRY_THRESHOLD. */
@@ -49,7 +49,18 @@ export class WorldController {
     const head = Number(await this.ctx.chain.publicClient.getBlockNumber());
     // The cursor is the next block to index, so everything below it is done.
     const indexedTo = (await this.ctx.indexer.cursor()) - 1;
-    return { ok: true, chainId: this.ctx.chain.chain.id, head, indexedTo, lag: Math.max(0, head - indexedTo), llm: this.ctx.llmEnabled };
+    const keeperBalance = await this.ctx.chain.keeperBalance();
+    return {
+      ok: true,
+      chainId: this.ctx.chain.chain.id,
+      head,
+      indexedTo,
+      lag: Math.max(0, head - indexedTo),
+      llm: this.ctx.llmEnabled,
+      keeper: this.ctx.chain.keeper.account.address,
+      keeperBalance: formatEther(keeperBalance),
+      keeperLow: keeperBalance < parseEther(this.ctx.env.KEEPER_MIN_BALANCE),
+    };
   }
 
   @Get("config")

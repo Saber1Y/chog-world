@@ -46,6 +46,14 @@ export const envSchema = z.object({
   /** Seconds between scheduler sweeps. */
   SCHEDULER_INTERVAL_SEC: z.coerce.number().int().min(5).default(60),
   AGENT_ENABLED: bool,
+  /**
+   * Below this keeper balance (in MON) the agent stops starting new moves, keeping the rest for
+   * settling quests and battles already in flight.
+   */
+  KEEPER_MIN_BALANCE: z
+    .string()
+    .regex(/^\d+(\.\d+)?$/, "must be a MON amount like 0.05")
+    .default("0.05"),
 
   RESOLVE_INTERVAL_SEC: z.coerce.number().int().min(1).default(4),
   INDEX_INTERVAL_SEC: z.coerce.number().int().min(1).default(3),

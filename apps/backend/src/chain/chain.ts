@@ -135,6 +135,10 @@ export class ChainService {
         : new TxSender(this.publicClient, createWalletClient({ chain, transport, account: resolverAccount }), resolverAccount);
   }
 
+  keeperBalance(): Promise<bigint> {
+    return this.publicClient.getBalance({ address: this.keeper.account.address });
+  }
+
   /** Confirms the RPC and the keeper are wired to the deployment this process expects. */
   async verify(operatorKeeper: () => Promise<Address>): Promise<void> {
     const id = await this.publicClient.getChainId();
