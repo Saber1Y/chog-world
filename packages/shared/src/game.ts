@@ -201,6 +201,22 @@ export const POLICY_PRESETS = {
 } as const;
 export type PolicyPresetKey = keyof typeof POLICY_PRESETS;
 
+/** One MON in wei. Gas fees are paid in MON, not CHOG. */
+export const MON = 10n ** 18n;
+/** Hard ceiling on ChogOperator's per-move gas fee (MAX_GAS_FEE in the contract). */
+export const GAS_FEE_CEILING = MON / 2n;
+/**
+ * The most MON an owner agrees to pay the keeper per move when they enroll. A move costs the keeper
+ * about 0.05 to 0.13 MON in gas (start plus settle), so this leaves room for gas prices to move.
+ */
+export const DEFAULT_MAX_GAS_FEE = MON / 5n;
+
+/** ChogOperator.PolicyParams for a preset, with every action kind allowed and no expiry. */
+export function policyParams(preset: PolicyPresetKey, maxGasFee: bigint = DEFAULT_MAX_GAS_FEE) {
+  const p = POLICY_PRESETS[preset];
+  return { expiry: 0n, actionMask: ALL_ACTIONS, maxActionsPerDay: p.maxActionsPerDay, maxPerAction: p.maxPerAction, dailyCap: p.dailyCap, maxGasFee };
+}
+
 export function questById(id: number): QuestDef | undefined {
   return QUESTS.find((q) => q.id === id);
 }
