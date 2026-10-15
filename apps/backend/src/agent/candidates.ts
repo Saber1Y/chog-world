@@ -58,9 +58,27 @@ function seedSalt(s: ChogSnapshot, tag: string): Hex {
   return keccak256(encodeAbiParameters([{ type: "bytes32" }, { type: "string" }], [s.key, tag]));
 }
 
-function allowed(s: ChogSnapshot, kind: number): boolean {
+/**
+ * Why ChogOperator would refuse this kind of move for gas, or "" when the Chog can pay: the world's
+ * fee is above what the owner agreed to, or the Chog's account holds less MON than the fee.
+ */
+export function gasBlock(s: ChogSnapshot, kind: number): string {
+  const fee = s.gas.fees[kind as 0 | 1 | 2 | 3] ?? 0n;
+  if (fee > s.policy.maxGasFee) return "gas fee above owner limit";
+  if (fee > s.gas.balance) return "needs MON for gas";
+  return "";
+}
+
+function permitted(s: ChogSnapshot, kind: number): boolean {
   return (s.policy.actionMask & (1 << kind)) !== 0;
 }
+
+/** Allowed by the owner's mask and affordable in gas: anything else would only waste a transaction. */
+function allowed(s: ChogSnapshot, kind: number): boolean {
+  return permitted(s, kind) && gasBlock(s, kind) === "";
+}
+
+const KINDS = [ActionKind.QUEST, ActionKind.ATTACK, ActionKind.BUY, ActionKind.USE];
 
 /** Most the agent may spend on one action right now: wallet, policy cap and remaining daily budget. */
 export function spendable(s: ChogSnapshot): bigint {
@@ -130,6 +148,13 @@ function menu(s: ChogSnapshot, opponents: OpponentView[]): Candidate[] {
     { id: "rest", kind: "rest", cost: 0n, label: "Rest and wait for a better moment", score: 0.05, facts: {} },
   ];
   if (s.policy.actionsLeft <= 0) return out;
+  // Every permitted kind blocked by gas: say so, so the owner knows to top up (or raise the limit).
+  const gasReasons = KINDS.filter((k) => permitted(s, k)).map((k) => gasBlock(s, k));
+  if (gasReasons.length > 0 && gasReasons.every((r) => r !== "")) {
+    const reason = gasReasons.includes("needs MON for gas") ? "needs MON for gas" : "gas fee above owner limit";
+    out[0] = { ...out[0]!, label: reason === "needs MON for gas" ? "Rest: out of MON for gas" : "Rest: gas fee is above my owner's limit", facts: { reason } };
+    return out;
+  }
   const budget = spendable(s);
   const injured = s.character.injuredUntil > s.blockTime;
   const buffed = s.character.buffUntil > s.blockTime;

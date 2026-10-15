@@ -25,6 +25,15 @@ export interface PolicyView {
   windowStart: number;
   remaining: bigint;
   actionsLeft: number;
+  /** Most MON the owner pays the keeper per move. */
+  maxGasFee: bigint;
+}
+
+/** The Chog's gas tank: MON in its account and the world's current per-move gas fee by action kind. */
+export interface GasView {
+  balance: bigint;
+  /** Indexed by ActionKind (quest, attack, buy, use). */
+  fees: [bigint, bigint, bigint, bigint];
 }
 
 export interface CharacterView {
@@ -59,6 +68,7 @@ export interface ChogSnapshot {
   /** Empty when the agent may act; otherwise why not, straight from ChogOperator. */
   inactiveReason: string;
   balance: bigint;
+  gas: GasView;
   items: Record<number, number>;
   activeRunId: bigint;
   pendingBattleId: bigint;
@@ -87,9 +97,10 @@ export class WorldReader {
   async snapshot(tokenId: bigint): Promise<ChogSnapshot> {
     const c = this.d.collection;
     const [key, account, block] = await Promise.all([this.keyOf(tokenId), this.accountOf(tokenId), this.client.getBlock()]);
+    const operator = { address: this.d.operator, abi: chogOperatorAbi, functionName: "gasFee" } as const;
     const itemIds = ITEMS.map((i) => BigInt(i.id));
 
-    const [owner, ch, stats, policy, reason, remaining, balance, itemBalances, run, pendingBattle] = await this.client.multicall({
+    const [owner, ch, stats, policy, reason, remaining, balance, itemBalances, run, pendingBattle, fee0, fee1, fee2, fee3] = await this.client.multicall({
       allowFailure: false,
       contracts: [
         { address: c, abi: erc721Abi, functionName: "ownerOf", args: [tokenId] },
@@ -102,8 +113,13 @@ export class WorldReader {
         { address: this.d.items, abi: chogItemsAbi, functionName: "balanceOfBatch", args: [itemIds.map(() => account), itemIds] },
         { address: this.d.quests, abi: questBoardAbi, functionName: "activeRun", args: [key] },
         { address: this.d.arena, abi: arenaAbi, functionName: "pendingBattle", args: [key] },
+        { ...operator, args: [0] },
+        { ...operator, args: [1] },
+        { ...operator, args: [2] },
+        { ...operator, args: [3] },
       ],
     });
+    const gasBalance = await this.client.getBalance({ address: account });
     const lastStarted = await this.client.multicall({
       allowFailure: false,
       contracts: QUESTS.map((q) => ({
@@ -142,9 +158,11 @@ export class WorldReader {
         windowStart,
         remaining,
         actionsLeft: Math.max(0, maxActionsPerDay - (windowExpired ? 0 : Number(policy.actionsToday))),
+        maxGasFee: policy.maxGasFee,
       },
       inactiveReason: reason,
       balance,
+      gas: { balance: gasBalance, fees: [fee0, fee1, fee2, fee3] },
       items: Object.fromEntries(ITEMS.map((it, i) => [it.id, Number(itemBalances[i] ?? 0n)])),
       activeRunId: run[0],
       pendingBattleId: pendingBattle,

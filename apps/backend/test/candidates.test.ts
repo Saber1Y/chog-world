@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CHOG, ActionKind } from "@chog-world/shared";
-import { buildCandidates, moveKey, REPEAT_PENALTY, spendable } from "../src/agent/candidates.js";
+import { buildCandidates, gasBlock, moveKey, REPEAT_PENALTY, spendable } from "../src/agent/candidates.js";
 import type { ChogSnapshot, OpponentView } from "../src/world/reader.js";
 import { screen } from "../src/security/firewall.js";
 
@@ -20,10 +20,11 @@ function snap(over: Partial<ChogSnapshot> = {}, character: Partial<ChogSnapshot[
     policy: {
       owner: "0x0000000000000000000000000000000000000003", active: true, paused: false, actionMask: 0x0f, expiry: 0,
       maxPerAction: 60n * CHOG, dailyCap: 150n * CHOG, maxActionsPerDay: 24, actionsToday: 0, windowStart: 0,
-      remaining: 150n * CHOG, actionsLeft: 24,
+      remaining: 150n * CHOG, actionsLeft: 24, maxGasFee: 2n * 10n ** 17n,
     },
     inactiveReason: "",
     balance: 300n * CHOG,
+    gas: { balance: 10n ** 18n, fees: [9n * 10n ** 16n, 13n * 10n ** 16n, 6n * 10n ** 16n, 5n * 10n ** 16n] },
     items: { 1: 0, 2: 0, 11: 0, 12: 0, 13: 0, 21: 0, 22: 0, 23: 0 },
     activeRunId: 0n,
     pendingBattleId: 0n,
@@ -101,6 +102,30 @@ describe("buildCandidates", () => {
     for (const c of tired.filter((c) => c.kind === "attack")) {
       expect(c.score).toBeCloseTo(fresh.find((f) => f.id === c.id)!.score - REPEAT_PENALTY);
     }
+  });
+
+  it("offers only moves whose gas fee the Chog can pay", () => {
+    const s = snap({ gas: { balance: 10n * 10n ** 16n, fees: [9n * 10n ** 16n, 13n * 10n ** 16n, 6n * 10n ** 16n, 5n * 10n ** 16n] } });
+    const kinds = new Set(buildCandidates(s, [rival]).map((c) => c.kind));
+    expect(kinds.has("quest")).toBe(true); // 0.09 MON fits in 0.10
+    expect(kinds.has("attack")).toBe(false); // 0.13 MON does not
+    expect(gasBlock(s, ActionKind.ATTACK)).toBe("needs MON for gas");
+  });
+
+  it("rests with the reason when it cannot pay gas for anything", () => {
+    const broke = buildCandidates(snap({ gas: { balance: 0n, fees: [9n * 10n ** 16n, 13n * 10n ** 16n, 6n * 10n ** 16n, 5n * 10n ** 16n] } }), [rival]);
+    expect(broke).toHaveLength(1);
+    expect(broke[0]).toMatchObject({ kind: "rest", label: "Rest: out of MON for gas", facts: { reason: "needs MON for gas" } });
+
+    const s = snap();
+    s.policy.maxGasFee = 0n;
+    expect(buildCandidates(s, [rival])[0]).toMatchObject({ label: "Rest: gas fee is above my owner's limit" });
+  });
+
+  it("plays normally when the world charges no gas fee", () => {
+    const s = snap({ gas: { balance: 0n, fees: [0n, 0n, 0n, 0n] } });
+    s.policy.maxGasFee = 0n;
+    expect(buildCandidates(s, [rival]).some((c) => c.kind === "quest")).toBe(true);
   });
 
   it("goals shift the ranking: an explorer prefers new zones", () => {

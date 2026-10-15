@@ -50,7 +50,12 @@ export function heuristic(ctx: DecisionContext, candidates: Candidate[], fallbac
   const why = goal ? `it serves my goal to ${GOAL_LABELS[goal].toLowerCase()}` : "it is the best value right now";
   return {
     candidate: best,
-    thought: best.kind === "rest" ? "Nothing worth the risk right now. Resting." : `${best.label}: ${why}.`,
+    thought:
+      best.kind === "rest"
+        ? best.facts.reason
+          ? `${best.label}. Top up my wallet with MON and I will get back to it.`
+          : "Nothing worth the risk right now. Resting."
+        : `${best.label}: ${why}.`,
     decidedBy: "heuristic",
     ...(fallbackReason ? { fallbackReason } : {}),
   };
