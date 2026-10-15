@@ -87,9 +87,13 @@ export interface ChogView {
     actionsToday: number;
     remaining: string;
     actionsLeft: number;
+    /** Most MON (wei) the owner pays the keeper per move. */
+    maxGasFee: string;
   };
   inactiveReason: string;
   balance: string;
+  /** MON (wei) in the Chog's account and the world's per-move gas fee by action kind. */
+  gas: { balance: string; fees: [string, string, string, string] };
   items: Record<string, number>;
   activeRunId: string;
   pendingBattleId: string;
