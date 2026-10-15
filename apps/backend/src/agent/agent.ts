@@ -1,17 +1,25 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, lte, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, ne } from "drizzle-orm";
 import { CHOG, type Deployment } from "@chog-world/shared";
 import type { Hex } from "viem";
 import type { Database } from "../database/db.js";
-import { chogs } from "../database/schema.js";
+import { actions, chogs } from "../database/schema.js";
 import type { WorldReader, ChogSnapshot } from "../world/reader.js";
 import type { Journal } from "../journal/journal.js";
-import { buildCandidates } from "./candidates.js";
-import type { Decider, DecisionContext } from "./decider.js";
+import { buildCandidates, moveKey, REPEAT_WINDOW } from "./candidates.js";
+import { heuristic, type Decider, type DecisionContext } from "./decider.js";
 import type { Executor } from "./executor.js";
 
 export interface AgentConfig {
+  /** Shortest gap between two looks at the same Chog. */
   tickMinutes: number;
+  /**
+   * Most moves a Chog makes per day, whatever its policy allows. Every move costs the keeper gas, so
+   * moves are spread evenly across the day instead of spent as fast as the policy permits.
+   */
+  movesPerDay: number;
+  /** How long a Chog waits after resting before it reconsiders. */
+  restMinutes: number;
   /** Chogs handled per sweep, so one sweep never runs unbounded. */
   batchSize: number;
   /** Opponents scouted per tick. */
@@ -95,7 +103,7 @@ export class Agent {
     }
 
     const opponents = await this.scout(s);
-    const candidates = buildCandidates(s, opponents);
+    const candidates = buildCandidates(s, opponents, await this.recentMoves(s.key));
     const recent = (await this.journal.list(s.key, { limit: 5 })).map((e) => e.title);
     const ctx: DecisionContext = {
       tokenId,
@@ -109,7 +117,8 @@ export class Agent {
       injured: s.character.injuredUntil > s.blockTime,
       recent,
     };
-    const decision = await this.decider.decide(ctx, candidates);
+    // Nothing to choose between: rest without asking the decider (an LLM call would be wasted).
+    const decision = candidates.length > 1 ? await this.decider.decide(ctx, candidates) : heuristic(ctx, candidates);
     const { actionId, outcome } = await this.executor.execute(s.key, tokenId, decision, randomUUID());
 
     // Consecutive rests are one story beat, not one per tick: skip a rest that follows a rest.
@@ -138,10 +147,30 @@ export class Agent {
         : outcome.status === "executed"
           ? decision.candidate.label
           : `${outcome.status}: ${"reason" in outcome ? outcome.reason : ""}`;
-    // A failed send retries sooner; everything else waits a full tick.
-    await this.reschedule(s.key, note, outcome.status === "failed" ? 2 : this.cfg.tickMinutes);
+    await this.reschedule(s.key, note, this.nextTickMinutes(outcome.status, s.policy.maxActionsPerDay));
     if (outcome.status !== "rested") this.log(`#${tokenId} ${note}`);
     return { tokenId, status: outcome.status, note };
+  }
+
+  /** Minutes until this Chog acts again: a failed send retries soon, a move waits its share of the day. */
+  nextTickMinutes(status: TickResult["status"], policyMovesPerDay: number): number {
+    if (status === "failed") return 2;
+    if (status === "executed") {
+      const perDay = Math.max(1, Math.min(this.cfg.movesPerDay, policyMovesPerDay));
+      return Math.max(this.cfg.tickMinutes, Math.floor((24 * 60) / perDay));
+    }
+    return Math.max(this.cfg.tickMinutes, this.cfg.restMinutes);
+  }
+
+  /** Move keys of this Chog's latest moves that went onchain, newest first. */
+  private async recentMoves(key: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ kind: actions.kind, params: actions.params })
+      .from(actions)
+      .where(and(eq(actions.chogKey, key), inArray(actions.status, ["submitted", "executed"])))
+      .orderBy(desc(actions.createdAt))
+      .limit(REPEAT_WINDOW);
+    return rows.map((r) => moveKey(r.kind, r.params as Record<string, unknown>));
   }
 
   /** Opponents near this Chog's level, from Chogs the world knows about. */

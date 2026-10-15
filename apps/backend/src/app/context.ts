@@ -62,7 +62,7 @@ export async function buildContext(env: Env, log: (scope: string, msg: string) =
     executor,
     journal,
     chain.deployment,
-    { tickMinutes: env.TICK_MINUTES, batchSize: 20, scoutCount: 6 },
+    { tickMinutes: env.TICK_MINUTES, movesPerDay: env.MOVES_PER_DAY, restMinutes: env.REST_MINUTES, batchSize: 20, scoutCount: 6 },
     (m) => log("agent", m),
     async () => {
       const balance = await chain.keeperBalance();

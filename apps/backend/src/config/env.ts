@@ -61,6 +61,12 @@ export const envSchema = z.object({
   INDEX_INTERVAL_SEC: z.coerce.number().int().min(1).default(3),
   /** getLogs block span per request; Monad's public RPC rejects wide ranges. */
   LOG_RANGE: z.coerce.number().int().min(1).max(10_000).default(100),
+  /** Most moves a Chog makes per day, however much its policy allows; spaced evenly to keep keeper gas bounded. */
+  MOVES_PER_DAY: z.coerce.number().int().min(1).max(96).default(12),
+  /** Minutes a Chog waits after resting before it reconsiders. */
+  REST_MINUTES: z.coerce.number().int().min(1).default(60),
+  /** Gas limit headroom over the estimate, in basis points. Monad charges the whole limit, so keep it small. */
+  GAS_MARGIN_BPS: z.coerce.number().int().min(0).max(5_000).default(1_000),
   /** The agent starts no new moves while the indexer is further behind the head than this. */
   MAX_INDEX_LAG: z.coerce.number().int().min(1).max(200).default(60),
   HOLDERS_INTERVAL_SEC: z.coerce.number().int().min(30).default(300),

@@ -13,11 +13,23 @@ describe("Agent spend gate", () => {
       untouched,
       untouched,
       untouched,
-      { tickMinutes: 5, batchSize: 20, scoutCount: 6 },
+      { tickMinutes: 5, movesPerDay: 6, restMinutes: 60, batchSize: 20, scoutCount: 6 },
       (m) => logs.push(m),
       async () => ({ ok: false, reason: "keeper balance 0.01 MON is below 0.05 MON; top it up" }),
     );
     expect(await agent.sweep()).toEqual([]);
     expect(logs).toEqual(["not starting new moves: keeper balance 0.01 MON is below 0.05 MON; top it up"]);
+  });
+
+  it("spreads moves across the day and waits longer after resting", () => {
+    const untouched = {} as never;
+    const agent = new Agent(untouched, untouched, untouched, untouched, untouched, untouched, {
+      tickMinutes: 15, movesPerDay: 6, restMinutes: 60, batchSize: 20, scoutCount: 6,
+    });
+    expect(agent.nextTickMinutes("executed", 24)).toBe(240); // the platform pace wins over a looser policy
+    expect(agent.nextTickMinutes("executed", 3)).toBe(480); // a stricter policy slows it further
+    expect(agent.nextTickMinutes("rested", 24)).toBe(60);
+    expect(agent.nextTickMinutes("blocked", 24)).toBe(60);
+    expect(agent.nextTickMinutes("failed", 24)).toBe(2);
   });
 });
