@@ -7,15 +7,17 @@ import { erc20Abi, parseAbi, parseUnits, type Address } from "viem";
 import {
   accountV3Abi,
   chogOperatorAbi,
-  ALL_ACTIONS,
+  DEFAULT_MAX_GAS_FEE,
   Goal,
-  POLICY_PRESETS,
+  policyParams,
   type Deployment,
   type PolicyPresetKey,
 } from "@chog-world/shared";
 import { api, type ChogView } from "@/lib/api";
 import { isTestnet } from "@/lib/config";
 import { chog as fmtChog } from "@/lib/format";
+import { gasTank, mon } from "@/lib/gas";
+import { GasTopUp } from "./GasTopUp";
 import { useTx } from "@/hooks/useTx";
 import { TxStatus } from "./TxStatus";
 import { GoalPicker, PresetPicker } from "./PolicyPickers";
@@ -27,7 +29,7 @@ const STEPS: { id: StepId; title: string; blurb: string }[] = [
   { id: "account", title: "Give it a wallet", blurb: "Your Chog gets its own wallet, bound to the NFT. It will hold its coins, gear and trophies." },
   { id: "permission", title: "Let it act", blurb: "Allow CHOG World's rule contract to act for your Chog. Never our server, and you can revoke it any time." },
   { id: "enroll", title: "Goals and budget", blurb: "Tell it what to chase and how much it may spend per day. The limits are enforced onchain." },
-  { id: "fund", title: "Fund it", blurb: "Send it some CHOG to pay quest and arena fees. Whatever it earns stays in its wallet." },
+  { id: "fund", title: "Fund it", blurb: "Send it CHOG for quest and arena fees, and a little MON so it pays its own gas. Whatever it earns stays in its wallet." },
 ];
 
 export function AwakenWizard({ chog, deployment }: { chog: ChogView; deployment: Deployment }) {
@@ -44,7 +46,8 @@ export function AwakenWizard({ chog, deployment }: { chog: ChogView; deployment:
   });
 
   const enrolled = chog.policy.active && chog.policy.owner.toLowerCase() === address?.toLowerCase();
-  const funded = BigInt(chog.balance) > 0n;
+  const tank = gasTank(chog);
+  const funded = BigInt(chog.balance) > 0n && (!tank.charges || tank.balance >= tank.maxFee);
   const done: Record<StepId, boolean> = {
     account: chog.accountDeployed,
     permission: permission.data === true,
@@ -179,12 +182,19 @@ function EnrollStep({ chog, deployment, onDone }: { chog: ChogView; deployment: 
   const tx = useTx();
   const [goals, setGoals] = useState<number>(Goal.MONEY | Goal.STRONGEST);
   const [preset, setPreset] = useState<PolicyPresetKey>("BALANCED");
-  const p = POLICY_PRESETS[preset];
+  const tank = gasTank(chog);
 
   return (
     <div className="space-y-6">
       <GoalPicker value={goals} onChange={setGoals} />
       <PresetPicker value={preset} onChange={setPreset} />
+      {tank.charges && (
+        <p className="rounded-2xl border-2 border-night-3 bg-night p-4 text-sm text-muted">
+          <span className="font-bold text-paper">It pays its own gas.</span> Every move costs the network about {mon(tank.questFee)} MON, paid from
+          your Chog&apos;s wallet. You allow at most <span className="text-paper">{mon(DEFAULT_MAX_GAS_FEE)} MON per move</span>; the contract refuses
+          anything higher.
+        </p>
+      )}
 
       <div className="space-y-2">
         <PrimaryButton
@@ -195,12 +205,7 @@ function EnrollStep({ chog, deployment, onDone }: { chog: ChogView; deployment: 
                 address: deployment.operator,
                 abi: chogOperatorAbi,
                 functionName: "enroll",
-                args: [
-                  deployment.collection,
-                  BigInt(chog.tokenId),
-                  { expiry: 0n, actionMask: ALL_ACTIONS, maxActionsPerDay: p.maxActionsPerDay, maxPerAction: p.maxPerAction, dailyCap: p.dailyCap },
-                  goals,
-                ],
+                args: [deployment.collection, BigInt(chog.tokenId), policyParams(preset), goals],
               }),
             );
             if (ok) onDone();
@@ -231,68 +236,94 @@ function FundStep({ chog, deployment, onDone }: { chog: ChogView; deployment: De
     }
   }, [amount]);
   const tooMuch = wallet.data !== undefined && wei > wallet.data;
+  const tank = gasTank(chog);
+  const hasChog = BigInt(chog.balance) > 0n;
+  const needsGas = tank.charges && tank.balance < tank.maxFee;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {AMOUNTS.map((a) => (
-          <button
-            key={a}
-            type="button"
-            onClick={() => setAmount(a)}
-            className={`rounded-full border-[3px] border-ink px-4 py-1.5 font-bold ${amount === a ? "bg-monad" : "bg-night text-muted hover:text-paper"}`}
-          >
-            {a}
-          </button>
-        ))}
-        <label className="flex items-center gap-2">
-          <span className="sr-only">Custom amount</span>
-          <input
-            aria-label="Amount of CHOG to send"
-            inputMode="decimal"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
-            className="w-28 rounded-xl border-[3px] border-ink bg-night px-3 py-1.5 font-mono"
-          />
-          <span className="font-bold">CHOG</span>
-        </label>
-      </div>
-      <p className="text-sm text-muted">
-        In your wallet: {wallet.data !== undefined ? `${fmtChog(wallet.data)} CHOG` : "…"}
-        {tooMuch && <span className="ml-2 text-danger">That is more than you have.</span>}
-      </p>
-      <div className="flex flex-wrap items-center gap-3">
-        <PrimaryButton
-          disabled={wei === 0n || tooMuch}
-          busy={tx.state.status === "signing" || tx.state.status === "pending" || tx.state.status === "done"}
-          onClick={async () => {
-            const ok = await tx.run(() =>
-              writeContractAsync({ address: deployment.chogToken, abi: erc20Abi, functionName: "transfer", args: [chog.account, wei] }),
-            );
-            if (ok) {
-              await api.nudge(chog.tokenId).catch(() => undefined);
-              onDone();
-            }
-          }}
-        >
-          Send {amount || "0"} CHOG
-        </PrimaryButton>
-        {isTestnet && (
-          <button
-            type="button"
-            disabled={faucetTx.state.status === "signing" || faucetTx.state.status === "pending"}
-            onClick={async () => {
-              const ok = await faucetTx.run(() => writeContractAsync({ address: deployment.chogToken, abi: faucetAbi, functionName: "faucet", args: [address!] }));
-              if (ok) wallet.refetch();
-            }}
-            className="rounded-xl px-3 py-2 text-sm font-bold text-gold underline decoration-dotted underline-offset-4 hover:text-paper disabled:opacity-50"
-          >
-            Get 500 test CHOG
-          </button>
-        )}
-      </div>
-      <TxStatus state={tx.state} />
-      <TxStatus state={faucetTx.state} />
+    <div className="space-y-6">
+      {tank.charges && <p className="text-sm font-bold text-paper">{hasChog ? "✓ " : ""}CHOG for fees</p>}
+      {hasChog ? (
+        <p className="text-sm text-muted">It has {fmtChog(chog.balance)} CHOG.</p>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {AMOUNTS.map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => setAmount(a)}
+                className={`rounded-full border-[3px] border-ink px-4 py-1.5 font-bold ${amount === a ? "bg-monad" : "bg-night text-muted hover:text-paper"}`}
+              >
+                {a}
+              </button>
+            ))}
+            <label className="flex items-center gap-2">
+              <span className="sr-only">Custom amount</span>
+              <input
+                aria-label="Amount of CHOG to send"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+                className="w-28 rounded-xl border-[3px] border-ink bg-night px-3 py-1.5 font-mono"
+              />
+              <span className="font-bold">CHOG</span>
+            </label>
+          </div>
+          <p className="text-sm text-muted">
+            In your wallet: {wallet.data !== undefined ? `${fmtChog(wallet.data)} CHOG` : "…"}
+            {tooMuch && <span className="ml-2 text-danger">That is more than you have.</span>}
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <PrimaryButton
+              disabled={wei === 0n || tooMuch}
+              busy={tx.state.status === "signing" || tx.state.status === "pending" || tx.state.status === "done"}
+              onClick={async () => {
+                const ok = await tx.run(() =>
+                  writeContractAsync({ address: deployment.chogToken, abi: erc20Abi, functionName: "transfer", args: [chog.account, wei] }),
+                );
+                if (ok) {
+                  await api.nudge(chog.tokenId).catch(() => undefined);
+                  onDone();
+                }
+              }}
+            >
+              Send {amount || "0"} CHOG
+            </PrimaryButton>
+            {isTestnet && (
+              <button
+                type="button"
+                disabled={faucetTx.state.status === "signing" || faucetTx.state.status === "pending"}
+                onClick={async () => {
+                  const ok = await faucetTx.run(() => writeContractAsync({ address: deployment.chogToken, abi: faucetAbi, functionName: "faucet", args: [address!] }));
+                  if (ok) wallet.refetch();
+                }}
+                className="rounded-xl px-3 py-2 text-sm font-bold text-gold underline decoration-dotted underline-offset-4 hover:text-paper disabled:opacity-50"
+              >
+                Get 500 test CHOG
+              </button>
+            )}
+          </div>
+          <TxStatus state={tx.state} />
+          <TxStatus state={faucetTx.state} />
+        </div>
+      )}
+      {tank.charges && (
+        <div className="space-y-3 border-t-2 border-night-3 pt-5">
+          <p className="text-sm font-bold text-paper">
+            {needsGas ? "" : "✓ "}MON for gas <span className="font-normal text-muted">· it has {mon(tank.balance)} MON</span>
+          </p>
+          {needsGas && (
+            <GasTopUp
+              chog={chog}
+              onDone={async () => {
+                await api.nudge(chog.tokenId).catch(() => undefined);
+                onDone();
+              }}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
