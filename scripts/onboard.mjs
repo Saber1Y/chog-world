@@ -1,17 +1,17 @@
 // Onboards Chogs on a dev/test deployment the same way the web app's Awaken wizard does:
 // mint a DevChog, let the backend sponsor its token-bound account, grant the operator,
-// enroll with goals and a budget, fund it from the DevCHOG faucet, and nudge the agent.
+// enroll with goals and a budget, fund it from the DevCHOG faucet, fill its gas tank, and nudge the agent.
 //
 //   RPC_URL=https://testnet-rpc.monad.xyz DEPLOYMENT_JSON=contracts/deployments/10143.json \
-//   API_URL=http://localhost:9101 OWNER_PRIVATE_KEY=0x... COUNT=1 node scripts/onboard.mjs
+//   API_URL=http://localhost:9101 OWNER_PRIVATE_KEY=0x... COUNT=1 FUND_MON=0.5 node scripts/onboard.mjs
 //
 // Only for DevChog/DevCHOG deployments (testnet or local). The key is read from the environment.
 import { readFileSync } from "node:fs";
 import { createPublicClient, createWalletClient, defineChain, http, parseAbi, parseEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { accountV3Abi, chogOperatorAbi, Goal, POLICY_PRESETS, ALL_ACTIONS } from "@chog-world/shared";
+import { accountV3Abi, chogOperatorAbi, Goal, policyParams } from "@chog-world/shared";
 
-const { RPC_URL, DEPLOYMENT_JSON, API_URL = "http://localhost:9100", OWNER_PRIVATE_KEY, COUNT = "1", FUND = "150" } = process.env;
+const { RPC_URL, DEPLOYMENT_JSON, API_URL = "http://localhost:9100", OWNER_PRIVATE_KEY, COUNT = "1", FUND = "150", FUND_MON = "0.5" } = process.env;
 if (!RPC_URL || !DEPLOYMENT_JSON || !OWNER_PRIVATE_KEY) {
   console.error("Set RPC_URL, DEPLOYMENT_JSON and OWNER_PRIVATE_KEY");
   process.exit(1);
@@ -52,7 +52,6 @@ if (balance < fund * BigInt(COUNT)) {
   await send(d.chogToken, devToken, "faucet", [account.address]);
 }
 
-const p = POLICY_PRESETS.BALANCED;
 for (let i = 0; i < Number(COUNT); i++) {
   const id = await pub.readContract({ address: d.collection, abi: devChog, functionName: "nextId" });
   await send(d.collection, devChog, "mint", [account.address]);
@@ -62,15 +61,14 @@ for (let i = 0; i < Number(COUNT); i++) {
   console.log(`  account ${tba} (sponsored by the keeper)`);
   await send(tba, accountV3Abi, "setPermissions", [[d.operator], [true]]);
   console.log("  granted the operator");
-  await send(d.operator, chogOperatorAbi, "enroll", [
-    d.collection,
-    id,
-    { expiry: 0n, actionMask: ALL_ACTIONS, maxActionsPerDay: p.maxActionsPerDay, maxPerAction: p.maxPerAction, dailyCap: p.dailyCap },
-    Goal.MONEY | Goal.EXPLORE,
-  ]);
+  await send(d.operator, chogOperatorAbi, "enroll", [d.collection, id, policyParams("BALANCED"), Goal.MONEY | Goal.EXPLORE]);
   console.log("  enrolled (Balanced, goals: money + explore)");
   await send(d.chogToken, devToken, "transfer", [tba, fund]);
   console.log(`  funded with ${FUND} dCHOG`);
+  // The Chog pays its own gas: a little MON in its account covers the keeper's fee per move.
+  const gasHash = await wallet.sendTransaction({ to: tba, value: parseEther(FUND_MON) });
+  await pub.waitForTransactionReceipt({ hash: gasHash });
+  console.log(`  gas tank filled with ${FUND_MON} MON`);
   await api(`/chogs/${id}/nudge`).catch(() => undefined);
   console.log("  agent nudged");
 }
