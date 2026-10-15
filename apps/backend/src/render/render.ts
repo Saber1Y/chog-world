@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import sharp from "sharp";
 import { CANVAS, renderOverlay, type ArtState } from "./art.js";
+import { CARD_HEIGHT, CARD_PORTRAIT, CARD_WIDTH, renderCardSvg, type CardState } from "./card.js";
 
 /** The collection's single shared image (every Chog's tokenURI points at the same metadata). */
 export const CHOG_IMAGE_CID = "bafybeia3tgqoxsjhp7fqtd57bfbbeqxmatimnqssk4onngoxd4gdcp5nfu";
@@ -64,10 +65,34 @@ export class Renderer {
       .png()
       .toBuffer();
     const out = size === CANVAS ? composed : await sharp(composed).resize(size, size).png().toBuffer();
-    if (this.cache.size >= this.maxEntries) this.cache.delete(this.cache.keys().next().value!);
-    this.cache.set(key, out);
+    this.remember(key, out);
     return out;
   }
+
+  /** A 1200x630 share card: the evolved portrait plus name, level, title and record. */
+  async card(state: CardState): Promise<Buffer> {
+    const key = `card:${JSON.stringify(state)}`;
+    const hit = this.cache.get(key);
+    if (hit) return hit;
+    const p = CARD_PORTRAIT;
+    const portrait = await sharp(await this.png(state.art, p.size)).composite([{ input: roundedMask(p.size, 26), blend: "dest-in" }]).png().toBuffer();
+    const out = await sharp(Buffer.from(renderCardSvg(state)))
+      .resize(CARD_WIDTH, CARD_HEIGHT)
+      .composite([{ input: portrait, left: p.x, top: p.y }])
+      .png()
+      .toBuffer();
+    this.remember(key, out);
+    return out;
+  }
+
+  private remember(key: string, value: Buffer): void {
+    if (this.cache.size >= this.maxEntries) this.cache.delete(this.cache.keys().next().value!);
+    this.cache.set(key, value);
+  }
+}
+
+function roundedMask(size: number, radius: number): Buffer {
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${radius}" fill="#fff"/></svg>`);
 }
 
 /** The coins in the shared art sit at about this hue. */

@@ -1,3 +1,4 @@
+import { chogAmount, renderCardSvg } from "../src/render/card.js";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -51,5 +52,23 @@ describe("overlay art", () => {
     expect(await r.png({ ...fresh, level: 22, scars: 3, weaponTier: 2, armorTier: 3, titles: 0b10, injured: true, nickname: "Grape" })).toBe(a);
     const small = await sharp(await r.png(fresh, 256)).metadata();
     expect(small.width).toBe(256);
+  });
+
+  it("renders a 1200x630 share card with the name escaped and the portrait inside", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "chog-card-"));
+    const basePath = join(dir, "base.png");
+    writeFileSync(basePath, await sharp({ create: { width: 1024, height: 1024, channels: 3, background: "#6a3fd1" } }).png().toBuffer());
+    const r = new Renderer(basePath);
+    const state = { art: { ...fresh, nickname: "<Grape & Co>" }, rep: 5, wins: 1, losses: 2, quests: 3, earned: "12.5", site: "example.test" };
+    const meta = await sharp(await r.card(state)).metadata();
+    expect([meta.width, meta.height, meta.format]).toEqual([1200, 630, "png"]);
+    expect(renderCardSvg(state)).toContain("&lt;Grape &amp; Co&gt;");
+  });
+
+  it("formats CHOG for the card", () => {
+    expect(chogAmount(0n)).toBe("0");
+    expect(chogAmount(1234n * 10n ** 18n + 5n * 10n ** 17n)).toBe("1,234.5");
+    expect(chogAmount(94n * 10n ** 18n + 81n * 10n ** 16n)).toBe("94.81");
+    expect(chogAmount(3n * 10n ** 16n)).toBe("0.03");
   });
 });
