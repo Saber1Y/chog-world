@@ -70,7 +70,7 @@ export class WorldController {
       head,
       indexedTo,
       lag: Math.max(0, head - indexedTo),
-      llm: this.ctx.llmEnabled,
+      llm: this.ctx.llmName ?? false,
       keeper: this.ctx.chain.keeper.account.address,
       keeperBalance: formatEther(keeperBalance),
       keeperLow: keeperBalance < parseEther(this.ctx.env.KEEPER_MIN_BALANCE),

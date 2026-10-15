@@ -12,7 +12,8 @@ import { Resolver } from "../resolver/resolver.js";
 import { Holders } from "../holders/holders.js";
 import { Executor } from "../agent/executor.js";
 import { Agent } from "../agent/agent.js";
-import { ClaudeDecider, HeuristicDecider, type Decider } from "../agent/decider.js";
+import { HeuristicDecider, LlmDecider, type Decider } from "../agent/decider.js";
+import { AnthropicModel, ModelChain, OpenAICompatibleModel, type TextModel } from "../llm/models.js";
 import { Renderer } from "../render/render.js";
 
 /** Composition root: every service, built once from the environment. Nest controllers receive this. */
@@ -29,6 +30,28 @@ export interface AppContext {
   agent: Agent;
   renderer: Renderer;
   llmEnabled: boolean;
+  /** The models in use, in order, for logs and /health; null when the agent runs on the heuristic. */
+  llmName: string | null;
+}
+
+/** The configured language models that have a key, in the order of LLM_PROVIDERS. */
+export function buildModels(env: Env): TextModel[] {
+  const t = env.AGENT_LLM_TIMEOUT_MS;
+  const models: TextModel[] = [];
+  for (const id of env.LLM_PROVIDERS.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean)) {
+    if (id === "gemini" && env.GEMINI_API_KEY) {
+      models.push(new OpenAICompatibleModel("gemini", env.GEMINI_BASE_URL, env.GEMINI_API_KEY, env.GEMINI_MODEL, t));
+    } else if (id === "openrouter" && env.OPENROUTER_API_KEY) {
+      models.push(
+        new OpenAICompatibleModel("openrouter", env.OPENROUTER_BASE_URL, env.OPENROUTER_API_KEY, env.OPENROUTER_MODEL, t, {
+          "X-Title": "CHOG World",
+        }),
+      );
+    } else if (id === "claude" && env.ANTHROPIC_API_KEY) {
+      models.push(new AnthropicModel(new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }), env.AGENT_MODEL, t));
+    }
+  }
+  return models;
 }
 
 export const APP_CONTEXT = Symbol("APP_CONTEXT");
@@ -44,11 +67,12 @@ export async function buildContext(env: Env, log: (scope: string, msg: string) =
   const reader = new WorldReader(chain.publicClient, chain.deployment);
   const journal = new Journal(db);
 
-  const llmEnabled = env.AGENT_LLM_ENABLED;
-  // The SDK resolves credentials itself (ANTHROPIC_API_KEY, auth token or an `ant auth login` profile).
-  const anthropic = llmEnabled ? new Anthropic(env.ANTHROPIC_API_KEY ? { apiKey: env.ANTHROPIC_API_KEY } : {}) : null;
-  const decider: Decider = anthropic ? new ClaudeDecider(anthropic, env.AGENT_MODEL, env.AGENT_LLM_TIMEOUT_MS) : new HeuristicDecider();
-  const digests = new Digests(db, journal, anthropic ? { client: anthropic, model: env.AGENT_MODEL, timeoutMs: env.AGENT_LLM_TIMEOUT_MS } : null);
+  const models = env.AGENT_LLM_ENABLED ? buildModels(env) : [];
+  const model = models.length ? new ModelChain(models) : null;
+  const llmEnabled = model !== null;
+  const llmName = model?.name ?? null;
+  const decider: Decider = model ? new LlmDecider(model) : new HeuristicDecider();
+  const digests = new Digests(db, journal, model);
 
   const keeperMin = parseEther(env.KEEPER_MIN_BALANCE);
   const indexer = new Indexer(db, chain.publicClient, chain.deployment, journal, env.LOG_RANGE, (m) => log("indexer", m));
@@ -78,5 +102,5 @@ export async function buildContext(env: Env, log: (scope: string, msg: string) =
 
   const renderer = new Renderer(env.ART_CACHE_PATH);
 
-  return { env, dbHandle, chain, reader, journal, digests, indexer, resolver, holders, agent, renderer, llmEnabled };
+  return { env, dbHandle, chain, reader, journal, digests, indexer, resolver, holders, agent, renderer, llmEnabled, llmName };
 }

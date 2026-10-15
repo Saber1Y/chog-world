@@ -36,10 +36,22 @@ export const envSchema = z.object({
   DATABASE_URL: z.preprocess((v) => (v === "" ? undefined : v), z.string().url().optional()),
   PGLITE_DIR: z.string().default("./.data/chogworld"),
 
+  /**
+   * Language models that decide and narrate, tried in this order. Each one is used only when its key
+   * is set; with none, the agent runs on the heuristic decider and templated digests.
+   */
+  LLM_PROVIDERS: z.string().default("gemini,openrouter,claude"),
+  /** Google AI Studio key, used through Gemini's OpenAI-compatible endpoint. */
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().default("gemini-3.5-flash-lite"),
+  GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta/openai"),
+  OPENROUTER_API_KEY: z.string().optional(),
+  /** `openrouter/free` routes to whichever free model is available. */
+  OPENROUTER_MODEL: z.string().default("openrouter/free"),
+  OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
   ANTHROPIC_API_KEY: z.string().optional(),
-  /** The decider and narrator model. */
+  /** The Claude model, when Claude is among the providers. */
   AGENT_MODEL: z.string().default("claude-sonnet-5-5"),
-  /** Without an Anthropic credential the agent runs on the heuristic decider and templated digests. */
   AGENT_LLM_ENABLED: bool,
   AGENT_LLM_TIMEOUT_MS: z.coerce.number().int().min(1_000).default(20_000),
 

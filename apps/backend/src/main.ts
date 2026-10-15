@@ -13,7 +13,7 @@ async function bootstrap() {
   const log = new Logger("bootstrap");
   log.log(
     `chain=${ctx.chain.chain.id} operator=${ctx.chain.deployment.operator} keeper=${ctx.chain.keeper.account.address} ` +
-      `db=${ctx.dbHandle.kind} llm=${ctx.llmEnabled ? env.AGENT_MODEL : "off (heuristic)"} agent=${env.AGENT_ENABLED ? "on" : "off"}`,
+      `db=${ctx.dbHandle.kind} llm=${ctx.llmName ?? "off (heuristic)"} agent=${env.AGENT_ENABLED ? "on" : "off"}`,
   );
 
   @Module({
