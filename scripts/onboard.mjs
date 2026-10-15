@@ -66,7 +66,8 @@ for (let i = 0; i < Number(COUNT); i++) {
   await send(d.chogToken, devToken, "transfer", [tba, fund]);
   console.log(`  funded with ${FUND} dCHOG`);
   // The Chog pays its own gas: a little MON in its account covers the keeper's fee per move.
-  const gasHash = await wallet.sendTransaction({ to: tba, value: parseEther(FUND_MON) });
+  // A fixed gas limit: Monad can underestimate a transfer into a Tokenbound account.
+  const gasHash = await wallet.sendTransaction({ to: tba, value: parseEther(FUND_MON), gas: 150_000n });
   await pub.waitForTransactionReceipt({ hash: gasHash });
   console.log(`  gas tank filled with ${FUND_MON} MON`);
   await api(`/chogs/${id}/nudge`).catch(() => undefined);

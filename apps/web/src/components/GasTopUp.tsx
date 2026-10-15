@@ -9,6 +9,11 @@ import { useTx } from "@/hooks/useTx";
 import { TxStatus } from "./TxStatus";
 
 const AMOUNTS = ["0.5", "1", "2"];
+/**
+ * A transfer into a Tokenbound account runs its receive logic, and Monad's estimate for it can come up
+ * short (a real top-up ran out of gas at the estimate). A fixed limit with headroom avoids that.
+ */
+const TOP_UP_GAS = 150_000n;
 
 /**
  * Sends MON from the owner's wallet into the Chog's own account, which pays the keeper a small fee
@@ -51,7 +56,7 @@ export function GasTopUp({ chog, onDone }: { chog: ChogView; onDone: () => void 
         type="button"
         disabled={tooMuch || tx.state.status === "signing" || tx.state.status === "pending"}
         onClick={async () => {
-          const ok = await tx.run(() => sendTransactionAsync({ to: chog.account, value: wei }));
+          const ok = await tx.run(() => sendTransactionAsync({ to: chog.account, value: wei, gas: TOP_UP_GAS }));
           if (ok) {
             void wallet.refetch();
             onDone();
