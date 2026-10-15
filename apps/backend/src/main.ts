@@ -27,8 +27,8 @@ async function bootstrap() {
   const allowed = env.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean);
   app.enableCors({ origin: allowed, credentials: false });
   app.get(Loops);
-  await app.listen(env.PORT);
-  log.log(`CHOG World backend listening on :${env.PORT}`);
+  await app.listen(env.PORT, env.HOST);
+  log.log(`CHOG World backend listening on ${env.HOST}:${env.PORT}`);
 
   const close = async () => {
     await app.close();

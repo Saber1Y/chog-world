@@ -18,6 +18,8 @@ const privateKey = z
  */
 export const envSchema = z.object({
   PORT: z.coerce.number().int().default(9100),
+  /** Interface to bind; 127.0.0.1 when a reverse proxy on the same host fronts the API. */
+  HOST: z.string().default("0.0.0.0"),
   CORS_ORIGIN: z.string().default("http://localhost:3100"),
 
   /** 143 mainnet, 10143 testnet, or an anvil fork of either. */
