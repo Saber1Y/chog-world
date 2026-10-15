@@ -1,0 +1,5 @@
+# Automatic HTTPS (Let's Encrypt) for the API domain, e.g. 203-0-113-7.sslip.io.
+{$API_DOMAIN} {
+	encode gzip
+	reverse_proxy backend:9100
+}

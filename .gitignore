@@ -24,3 +24,5 @@ apps/backend/.data/
 
 # Local secrets (never commit)
 .secrets/
+deploy/backend.env
+deploy/.env

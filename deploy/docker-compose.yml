@@ -1,0 +1,50 @@
+# CHOG World on a single VPS: Postgres + backend (agent, resolver, indexer, API) + Caddy (HTTPS).
+# Secrets live in ./backend.env on the server (chmod 600), never in this file.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chogworld
+      POSTGRES_USER: chogworld
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chogworld -d chogworld"]
+      interval: 5s
+      retries: 20
+
+  backend:
+    image: chogworld-backend:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: ./backend.env
+    environment:
+      DATABASE_URL: postgres://chogworld:${POSTGRES_PASSWORD}@postgres:5432/chogworld
+      PORT: "9100"
+      PUBLIC_URL: https://${API_DOMAIN:?set API_DOMAIN in .env}
+    # Only reachable through Caddy; one replica so only one keeper signs.
+    expose:
+      - "9100"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [backend]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
