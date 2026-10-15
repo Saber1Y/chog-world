@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- App icon / favicon: the mark on a Monad-purple sticker, legible on light and dark tabs. -->
+  <defs><clipPath id="sq"><rect x="1.5" y="1.5" width="61" height="61" rx="14"/></clipPath></defs>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="14" fill="#836ef9"/>
+  <g clip-path="url(#sq)" stroke="#0b0716" stroke-linejoin="round" stroke-linecap="round">
+    <g transform="translate(5 9) scale(0.84)">
+      <path d="M10 46 L9 27 L5 16 L16 20 L19 6 L27 15 L33 2 L39 15 L46 6 L49 20 L59 16 L55 27 L54 46 Z" fill="#4b2a9e" stroke-width="3.4"/>
+      <ellipse cx="32" cy="37" rx="17" ry="15" fill="#fdf0dc" stroke-width="3.4"/>
+      <path d="M15 32 L21 26.5 L24 31 L29 25 L32 30 L35 25 L40 31 L43 26.5 L49 32 C49 24 42 20 32 20 C22 20 15 24 15 32 Z" fill="#4b2a9e" stroke-width="3"/>
+      <ellipse cx="25.5" cy="38" rx="4.2" ry="4.8" fill="#0b0716" stroke="none"/>
+      <ellipse cx="38.5" cy="38" rx="4.2" ry="4.8" fill="#0b0716" stroke="none"/>
+      <circle cx="27" cy="36.2" r="1.6" fill="#fff" stroke="none"/>
+      <circle cx="40" cy="36.2" r="1.6" fill="#fff" stroke="none"/>
+      <ellipse cx="19.5" cy="43" rx="2.8" ry="1.6" fill="#ff7aa8" stroke="none"/>
+      <ellipse cx="44.5" cy="43" rx="2.8" ry="1.6" fill="#ff7aa8" stroke="none"/>
+      <circle cx="13" cy="61" r="10" fill="#ffd23f" stroke-width="3.4"/>
+      <circle cx="51" cy="61" r="10" fill="#ffd23f" stroke-width="3.4"/>
+      <circle cx="32" cy="63" r="11" fill="#ffd23f" stroke-width="3.4"/>
+    </g>
+  </g>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="14" stroke="#0b0716" stroke-width="3"/>
+</svg>
