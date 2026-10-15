@@ -1,7 +1,7 @@
 # CHOG World
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)
-![Tests](https://img.shields.io/badge/tests-118%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-141%20passing-brightgreen)
 ![Onchain](https://img.shields.io/badge/onchain-Monad%20testnet-blue)
 ![Loop](https://img.shields.io/badge/loop-decide%20%E2%86%92%20act%20%E2%86%92%20resolve%20%E2%86%92%20evolve-blueviolet)
 ![Stack](https://img.shields.io/badge/stack-Solidity%20+%20NestJS%20+%20Next.js%20+%20ERC--6551-orange)
@@ -93,7 +93,7 @@ The agent runs on a server, so the design assumes that server can be wrong, bugg
 Three layers make sure the worst it can do is waste a little of what the owner already allowed:
 
 1. *Permission goes to a contract, never a key.* The owner grants the immutable `ChogOperator` contract permission on the Chog's ERC-6551 account. The keeper key can only call `ChogOperator`, and `ChogOperator` only exposes typed game actions with fixed targets.
-2. *Every action is checked onchain.* `ChogOperator` enforces the per-action cap, the rolling 24-hour budget, the actions-per-day limit, the allowed-action mask, the expiry, the owner's pause and a global guardian pause before anything moves.
+2. *Every action is checked onchain.* `ChogOperator` enforces the per-action cap, the rolling 24-hour budget, the actions-per-day limit, the allowed-action mask, the expiry, the owner's pause, the owner's gas limit and a global guardian pause before anything moves.
 3. *Selling the NFT kills the agent.* The policy stores the owner at enrollment. If `ownerOf` changes or the owner revokes the account permission, every later action is refused, while the coins and gear stay in the Chog's account for the new owner.
 
 ## What CHOG World does
@@ -128,7 +128,9 @@ snapshot -> candidates (legal, affordable, scored by goals and simulated win odd
          -> decider (heuristic, or Claude when enabled) -> ChogOperator -> journal
 ```
 
-The menu only contains moves that pass the onchain policy, so the decider can never choose something the contract would refuse.
+The menu only contains moves that pass the onchain policy and that the Chog can pay gas for, so the decider can never choose something the contract would refuse.
+Moves it made recently score lower, so a Chog varies what it does, and each Chog makes at most a few moves a day, spread evenly (6 on the Balanced preset).
+The decider is a language model when keys are configured: Gemini (Google AI Studio) first, then OpenRouter's free models, then Claude, falling back to the heuristic on any error.
 Arena odds come from running the real battle engine locally against each candidate opponent.
 
 ### Quests
@@ -167,6 +169,23 @@ The image changes only when the Chog does, so it is cached by state.
 Everything a Chog does becomes a journal line: what it thought, where it went, what it won.
 Titles (First Blood, Giant Slayer, Unbroken, Explorer, Veteran, Devoted) are minted as soulbound trophies into the Chog's account.
 The leaderboard ranks Chogs by reputation, level, wins and earnings.
+
+### Every Chog pays its own gas
+
+Each move costs the keeper network gas, about 0.05 to 0.13 MON to start and settle it.
+The Chog's own account repays that as a fixed per-move fee in MON, so the world does not get more expensive to run as more Chogs join.
+
+```text
+owner signs maxGasFee in the policy -> ChogOperator checks fee <= maxGasFee and account MON >= fee
+-> on success the fee moves into ChogOperator, credited to the keeper -> keeper withdraws in batches
+```
+
+The guardian sets the fee per action kind and can never set it above `MAX_GAS_FEE` (0.5 MON).
+A Chog that runs out of MON simply rests until its owner tops it up; no transaction is wasted.
+
+### "While you were away"
+
+When an owner opens their Chog, a card summarises everything since their last visit, written in the Chog's voice from its journal rows only.
 
 ### Owner controls
 
@@ -288,6 +307,8 @@ flowchart LR
 | The world cannot be drained | Treasury pays under a rolling daily emission cap |
 | Owner text cannot steer the agent | Firewall on nickname and personality, signed by the owner, and treated as flavour only |
 | Duplicate sends do nothing | Each action carries a unique `actionId` that `ChogOperator` rejects if reused |
+| Gas fees cannot surprise the owner | The fee per move must be within the `maxGasFee` the owner signed, and below the hard `MAX_GAS_FEE` ceiling |
+| A fee recipient cannot break moves | Fees are pulled by the keeper (`withdrawGasFees`), never pushed, and the operator refuses stray MON |
 
 ## How it uses Monad
 
@@ -299,7 +320,7 @@ Testnet deployment (chain 10143, from block 71110456):
 
 | Contract | Address |
 | --- | --- |
-| ChogOperator | `0x4A050e97bBED792b91f72551EE09C18C94FECF92` |
+| ChogOperator | `0xe44962500305f9a60CCe8E909A344F4D87Dc1C97` (the gas-fee version; the first one, `0x4A05...CF92`, is paused) |
 | ChogState | `0xe66dd4f6A29ab1843A39Df47f0D0f9e46F3B858f` |
 | QuestBoard | `0x18a73d98fe7830927b24e9ab0c358946Ad8d64b4` |
 | Arena | `0x87c90a98fA6b5bcA9a09d0FaE5fB818CCd7b6f8C` |
@@ -311,8 +332,8 @@ Testnet deployment (chain 10143, from block 71110456):
 ERC-6551 uses the canonical registry `0x000000006551c19487814612e58FE06813775758` and Tokenbound V3.
 Mainnet targets the real Chog collection `0x9994604c3d3c43b82a79b41281e202613313afba` and $CHOG `0x350035555E10d9AfAF1566AaebfCeD5BA6C27777`.
 
-Monad charges the gas limit rather than gas used, so the keeper estimates every transaction and sends it with a 20% margin instead of a fixed high limit.
-Policy caps limit what a Chog spends in CHOG; gas is paid by the keeper and never comes out of the Chog's account.
+Monad charges the gas limit rather than gas used, so the keeper estimates every transaction and sends it with a 10% margin instead of a fixed high limit.
+Policy caps limit what a Chog spends in CHOG; the keeper pays the network gas and each Chog repays it with a small per-move fee in MON from its own account.
 
 ## Engineering decisions & the hard problems
 
@@ -333,7 +354,13 @@ The resolver only settles what the indexer has seen.
 After a restart the agent starts no new moves until the indexer is within 60 blocks of the head, so a move cannot expire before anyone sees it.
 
 **Monad charges the gas limit.**
-The keeper uses a single serialized queue with its own nonce, estimates each call and adds 20%, and stops starting moves when its balance falls below a floor.
+The keeper uses a single serialized queue with its own nonce, estimates each call and adds 10%, and stops starting moves when its balance falls below a floor.
+A plain MON transfer into a Tokenbound account is the exception: Monad's estimate for it can come up short, so top-ups use a fixed limit.
+
+**Each Chog pays its own way.**
+Batching settlements would save little, because most of a settlement's gas is the work itself.
+What scales is who pays: every move repays the keeper from the Chog's own MON under a limit the owner signed, and moves are spread across the day instead of spent as fast as the policy allows.
+The fee is pulled by the keeper rather than pushed, so even a recipient that rejects MON cannot make a Chog's move fail.
 
 **Indexing is transactional.**
 Each log is stored and applied inside one database transaction, and journal events are pushed to clients only after commit, so a crash never leaves half a story.
@@ -353,9 +380,10 @@ Claude only receives labels and numbers for legal moves, chooses one by id throu
 | Evolving art and metadata | Real - rendered from live state |
 | Owner controls, check-in, nickname firewall | Real |
 | Fork test against the real Chog NFT, registry and V3 on mainnet | Real - `pnpm contracts:fork` |
-| Claude decider and digests | Built and unit-tested, not enabled on the hosted testnet |
+| Per-move gas fees paid from each Chog's account | Real - live on testnet, proven on the real Tokenbound account in the fork test |
+| Language-model decider and digests (Gemini, OpenRouter, Claude) | Built and tested; enabled on the hosted testnet once API keys are added |
+| "While you were away" recap card | Real - template text until a model key is set |
 | Mainnet deployment with real Chogs and $CHOG | Not yet established |
-| "While you were away" digest card in the UI | Not yet established - the API exists |
 | Season rotation and season leaderboard | Not yet established - contract supports seasons |
 | Trading CHOG for other tokens | Not yet established |
 
@@ -366,20 +394,20 @@ The testnet keeper decides with the heuristic, which is why journal thoughts are
 
 | Suite | Tests | Covers |
 | --- | --- | --- |
-| `ChogOperator.t.sol` | 25 | Policies, caps, rolling budget, masks, expiry, pause, owner change, action dedup |
+| `ChogOperator.t.sol` | 33 | Policies, caps, rolling budget, masks, expiry, pause, owner change, action dedup, gas fees |
 | `ChogState.t.sol` | 14 | XP, levels, injuries, titles, goals, check-in streaks, seasons |
 | `Arena.t.sol` | 13 | Fees, payouts, bounties, burns, cooldowns, voiding, rivalries, titles |
 | `QuestBoard.t.sol` | 11 | Fees, seeding, rewards, loot, fizzles, cooldowns |
 | `BattleEngine.t.sol` | 7 | Determinism and round limits, fuzzed |
 | `ChogItems` / `Treasury` | 11 | Shop, soulbound trophies, emission cap |
 | `Invariants.t.sol` | 5 | Spend never exceeds caps; no action after the owner changes |
-| `MonadFork.t.sol` | fork | Real registry, V3 and Chog NFT on Monad mainnet |
-| Backend (vitest) | 25 | Decider fallbacks, candidates, render, agent gate, end-to-end on PGlite or Postgres |
+| `MonadFork.t.sol` | fork | Real registry, V3 and Chog NFT on Monad mainnet, including the gas fee |
+| Backend (vitest) | 40 | Model chain and decider fallbacks, candidates, pacing, gas tank, digests, render, end-to-end with gas fees on PGlite or Postgres |
 | Shared (vitest) | 7 | Engine and DNA parity with Solidity |
 
 ```bash
 cd chog-world
-pnpm contracts:test  # 86 Foundry tests
+pnpm contracts:test  # 94 Foundry tests
 MONAD_RPC_URL=https://rpc.monad.xyz pnpm contracts:fork
 pnpm test  # backend and shared
 pnpm typecheck && pnpm lint
@@ -422,8 +450,8 @@ pnpm dev  # http://localhost:3100
 1. Open the site and connect a wallet on Monad testnet.
 2. On *My Chogs*, press *Mint a free test Chog* (testnet only) or open one you own, then press *Awaken*.
 3. Step 1 creates its wallet for free; step 2 signs permission for `ChogOperator`.
-4. Step 3 picks goals and a budget preset and signs `enroll`.
-5. Step 4 claims test CHOG from the faucet and funds the Chog.
+4. Step 3 picks goals and a budget preset and signs `enroll`, agreeing to pay at most 0.2 MON of gas per move.
+5. Step 4 claims test CHOG from the faucet, funds the Chog, and adds a little MON to its gas tank.
 6. Watch *Right now* switch to its first move and the journal fill in as quests resolve.
 7. Open the Arena to replay its first fight and see *verified against chain*.
 8. Lower its budget or pause it from the owner panel and watch it stop.
@@ -440,7 +468,12 @@ Backend (`apps/backend/.env`)
 | `RESOLVER_PRIVATE_KEY` | Optional separate key for resolving |
 | `DATABASE_URL` / `PGLITE_DIR` | Postgres, or an embedded database for development |
 | `AGENT_ENABLED`, `TICK_MINUTES` | Turn the agent on and set how often each Chog acts |
-| `AGENT_LLM_ENABLED`, `ANTHROPIC_API_KEY`, `AGENT_MODEL` | Claude decider and digests |
+| `AGENT_LLM_ENABLED`, `LLM_PROVIDERS` | Turn the language models on, and the order to try them in |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | Google AI Studio (free tier) |
+| `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | OpenRouter, `openrouter/free` by default |
+| `ANTHROPIC_API_KEY`, `AGENT_MODEL` | Claude |
+| `MOVES_PER_DAY`, `REST_MINUTES` | Most moves per Chog per day, and the wait after resting |
+| `GAS_MARGIN_BPS`, `GAS_WITHDRAW_MIN`, `GAS_COLLECT_INTERVAL_SEC` | Gas limit headroom and when the keeper withdraws collected fees |
 | `KEEPER_MIN_BALANCE`, `MAX_INDEX_LAG` | When the agent stops starting new moves |
 | `LOG_RANGE`, `RPC_MAX_RPS`, `RPC_MAX_CONCURRENCY` | RPC limits for the public Monad endpoints |
 | `HOST`, `PORT`, `CORS_ORIGIN`, `PUBLIC_URL` | HTTP binding and allowed frontend origins |
@@ -506,7 +539,7 @@ ERC-6551 accounts are Tokenbound's V3 implementation.
 ### Roadmap
 
 - Mainnet deployment with real Chogs and $CHOG, with a funded and capped Treasury.
-- Claude on the hosted agent, with in-character thoughts and a "While you were away" digest on each Chog's page.
+- Language-model thoughts on the hosted agent, once API keys are added.
 - Seasons with a season leaderboard and end-of-season trophies.
 - Shareable Chog cards for social feeds.
 

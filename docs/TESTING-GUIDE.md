@@ -7,7 +7,8 @@ This guide walks through every page of CHOG World on Monad testnet and what to c
 - Live site: https://chog-world-zeta.vercel.app
 - Local dev server: http://localhost:3101, which uses the same hosted testnet backend, so both show the same world.
 - Wallet: MetaMask or Rabby on Monad testnet (chain 10143) with a little test MON for gas.
-- Pace: each Chog acts at most once every 15 minutes, and its first move comes soon after it is funded.
+- Pace: a Chog makes at most a few moves a day, spread evenly (6 a day on Balanced, so about every 4 hours), and its first move comes soon after it is funded.
+- Gas: each move costs the Chog a small fee in MON from its own wallet (0.09 MON for a quest, 0.13 for a battle), so keep a little test MON for its gas tank.
 - Quests and battles settle a few seconds after they start, once the block they use for randomness exists.
 
 To run the local dev server yourself:
@@ -56,8 +57,8 @@ Four steps, each saved onchain, so you can stop and come back:
 
 1. *Give it a wallet.* Free: the server pays to create the Chog's own ERC-6551 account. This gives the server no control over it.
 2. *Let it act.* One signature lets the game's rules contract (`ChogOperator`), not the server, act for the Chog.
-3. *Goals and budget.* Pick goals and a preset (Cautious, Balanced or Degen), then sign. The limits are enforced onchain.
-4. *Fund it.* Press *Get 500 test CHOG*, then send 100 or so to the Chog.
+3. *Goals and budget.* Pick goals and a preset (Cautious, Balanced or Degen), then sign. The limits are enforced onchain, including the most MON it may pay in gas per move (0.2).
+4. *Fund it.* Press *Get 500 test CHOG*, send 100 or so to the Chog, then add 0.5 or 1 MON to its gas tank.
 
 What to check:
 
@@ -73,7 +74,8 @@ What it shows:
 - *Level bar and record*: XP, reputation, wins, losses and scars.
 - *Stats*: bright bars are what it was born with, faint bars are what it has earned since.
 - *Right now*: when its next move comes, its last move and its goals.
-- *Its wallet*: CHOG balance, spent today against the daily cap, moves left today and total earned.
+- *While you were away* (owner only): a short summary of what happened since your last visit, in the Chog's voice.
+- *Its wallet*: CHOG balance, spent today against the daily cap, moves left today, its gas tank in MON and total earned.
 - *Journal*: live lines for what it thought, where it went, what it won, level-ups and titles.
 - *Battles*: its arena fights, with links to the replays.
 - *Trophies*: titles it has earned, minted into its own wallet.
@@ -82,6 +84,7 @@ The owner panel, shown only to the owner:
 
 - *Check in* once a day for +10 XP and a 24-hour +50% XP boost.
 - Change goals or the budget preset.
+- *Wallet* tab: top up or withdraw CHOG, and fill the gas tank with MON.
 - Pause and resume.
 - Set a nickname and personality, signed with your wallet.
 - Stop its agent (revoke).
@@ -126,6 +129,7 @@ What to check:
 
 ## 7. Safety checks worth trying
 
+- Let the gas tank run dry: the Chog rests with "out of MON for gas" and sends nothing until you top it up.
 - Transfer a test Chog to another wallet: its agent stops acting, and its coins and gear stay in the Chog's wallet for the new owner.
 - Set the Cautious preset and watch the Chog stop for the day once it reaches the cap.
 - Stop its agent from the owner panel and confirm the wizard offers to wake it again.
