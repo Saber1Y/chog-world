@@ -18,6 +18,7 @@ import {DevChog, DevCHOG} from "./dev/DevTokens.sol";
 ///
 /// Env: KEEPER (required), DAILY_EMISSION_CAP (wei, default 2000e18), BURN_BPS (default 1000),
 ///      ITEMS_URI, CHOG_URI (dev only), TREASURY_FUNDING (dev only, default 50000e18),
+///      GAS_FEE_QUEST / GAS_FEE_ATTACK / GAS_FEE_BUY / GAS_FEE_USE (wei of MON per move, default 0),
 ///      DEPLOYMENT_FILE (default "<chainId>.json"; use "local.json" for anvil forks).
 contract Deploy is Script, ChogWorldDeployer {
     uint256 internal constant MONAD = 143;
@@ -66,6 +67,11 @@ contract Deploy is Script, ChogWorldDeployer {
         );
 
         if (dev) DevCHOG(token).mint(address(w.treasury), vm.envOr("TREASURY_FUNDING", uint256(50_000 ether)));
+        // Per-move gas fees (wei of MON) each Chog pays the keeper; 0 leaves moves free.
+        w.operator.setGasFee(w.operator.ACTION_QUEST(), uint128(vm.envOr("GAS_FEE_QUEST", uint256(0))));
+        w.operator.setGasFee(w.operator.ACTION_ATTACK(), uint128(vm.envOr("GAS_FEE_ATTACK", uint256(0))));
+        w.operator.setGasFee(w.operator.ACTION_BUY(), uint128(vm.envOr("GAS_FEE_BUY", uint256(0))));
+        w.operator.setGasFee(w.operator.ACTION_USE(), uint128(vm.envOr("GAS_FEE_USE", uint256(0))));
         vm.stopBroadcast();
 
         _writeDeployment(w, collection, token, startBlock);
