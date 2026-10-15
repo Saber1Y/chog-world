@@ -12,6 +12,8 @@ export const appChain: Chain = RPC_URL
   : base;
 
 export const isTestnet = appChain.id === monadTestnet.id;
+/** A local anvil fork shares testnet's chain id but none of its state: label it differently. */
+export const isLocalFork = !!RPC_URL;
 
 export function explorerTx(hash: string): string | null {
   // A local fork has no explorer; the hash is still shown.

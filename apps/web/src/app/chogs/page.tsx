@@ -8,6 +8,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useQuery } from "@tanstack/react-query";
 import { api, type OwnedChog } from "@/lib/api";
 import { useWorldConfig } from "@/hooks/useWorld";
+import { isLocalFork } from "@/lib/config";
 import { ChogImage } from "@/components/ChogImage";
 import { ElementBadge, StatBars, dnaFor } from "@/components/Stats";
 import type { Address } from "viem";
@@ -49,7 +50,9 @@ export default function MyChogs() {
         <div className="sticker bg-night-2 px-6 py-14 text-center">
           <p className="font-display text-3xl">No Chogs in this wallet</p>
           <p className="mx-auto mt-2 max-w-md text-muted">
-            Ownership refreshes every few minutes, so a Chog you just bought may take a moment to show up. You can also open one by its number above.
+            {isLocalFork
+              ? "This is a local practice copy of the chain, so Chogs you own on real testnet don't appear here."
+              : "Ownership refreshes every few minutes, so a Chog you just bought may take a moment to show up. You can also open one by its number above."}
           </p>
         </div>
       )}

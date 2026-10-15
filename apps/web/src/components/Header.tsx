@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { isTestnet } from "@/lib/config";
+import { isLocalFork, isTestnet } from "@/lib/config";
 
 const NAV = [
   { href: "/", label: "World" },
@@ -30,10 +30,17 @@ export function Header() {
             CHOG <span className="text-gold">WORLD</span>
           </span>
         </Link>
-        {isTestnet && (
-          <span className="hidden rounded-full border-2 border-gold/60 px-2 py-0.5 text-xs font-semibold text-gold sm:inline">
-            testnet
+        {isLocalFork ? (
+          <span
+            className="hidden rounded-full border-2 border-danger/60 px-2 py-0.5 text-xs font-semibold text-danger sm:inline"
+            title="A private local copy of Monad testnet. Real testnet wallets and Chogs do not appear here."
+          >
+            local
           </span>
+        ) : (
+          isTestnet && (
+            <span className="hidden rounded-full border-2 border-gold/60 px-2 py-0.5 text-xs font-semibold text-gold sm:inline">testnet</span>
+          )
         )}
         <nav className="ml-auto hidden items-center gap-1 md:flex" aria-label="Main">
           {NAV.map((n) => {
