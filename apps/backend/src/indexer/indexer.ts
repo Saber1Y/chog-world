@@ -322,6 +322,7 @@ export class Indexer {
             fee: (a.fee as bigint).toString(),
             startBlock: Number(a.startBlock),
             status: "pending",
+            createdAt: e.blockTime,
           })
           .onConflictDoNothing({ target: battles.battleId });
         const [att, def] = await Promise.all([this.tokenOf(db, a.attKey as string), this.tokenOf(db, a.defKey as string)]);
