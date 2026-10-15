@@ -66,9 +66,13 @@ export async function buildContext(env: Env, log: (scope: string, msg: string) =
     (m) => log("agent", m),
     async () => {
       const balance = await chain.keeperBalance();
-      return balance >= keeperMin
-        ? { ok: true as const }
-        : { ok: false as const, reason: `keeper balance ${formatEther(balance)} MON is below ${env.KEEPER_MIN_BALANCE} MON; top it up` };
+      if (balance < keeperMin)
+        return { ok: false as const, reason: `keeper balance ${formatEther(balance)} MON is below ${env.KEEPER_MIN_BALANCE} MON; top it up` };
+      // The resolver only sees indexed runs and battles, and their seeds expire after 256 blocks:
+      // a move started while the indexer is catching up (after a restart) would fizzle or be voided.
+      const lag = Number(await chain.publicClient.getBlockNumber()) - (await indexer.cursor());
+      if (lag > env.MAX_INDEX_LAG) return { ok: false as const, reason: `indexer is ${lag} blocks behind; waiting for it to catch up` };
+      return { ok: true as const };
     },
   );
 
