@@ -21,3 +21,6 @@ contracts/deployments/dryrun*.json
 
 # Backend local data
 apps/backend/.data/
+
+# Local secrets (never commit)
+.secrets/
