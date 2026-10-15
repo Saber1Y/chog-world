@@ -32,6 +32,7 @@ import { battles, chogs } from "../database/schema.js";
 import { screen } from "../security/firewall.js";
 import { json } from "./json.js";
 import { artStateOf, metadataOf } from "../render/state.js";
+import { chogAmount, type CardState } from "../render/card.js";
 
 /** Battles with each side's token id and nickname attached. */
 async function withTokens(ctx: AppContext, rows: (typeof battles.$inferSelect)[]) {
@@ -193,6 +194,32 @@ export class ChogsController {
     }
     const png = await this.ctx.renderer.png(art, size);
     res.type("png").send(png);
+  }
+
+  /** A 1200x630 share card for social previews, cached like the portrait. */
+  @Get(":tokenId/card.png")
+  async card(@Param("tokenId") raw: string, @Res() res: Response) {
+    const tokenId = tokenIdParam(raw);
+    const { snapshot, art } = await this.artOf(tokenId);
+    const [row] = await this.ctx.dbHandle.db.select({ earned: chogs.earned }).from(chogs).where(eq(chogs.key, snapshot.key));
+    const c = snapshot.character;
+    const state: CardState = {
+      art,
+      rep: c.rep,
+      wins: c.wins,
+      losses: c.losses,
+      quests: c.quests,
+      earned: chogAmount(BigInt(row?.earned ?? "0")),
+      site: new URL(this.ctx.env.SITE_URL).host,
+    };
+    const etag = `"${createHash("sha1").update(JSON.stringify(state)).digest("hex")}"`;
+    res.setHeader("ETag", etag);
+    res.setHeader("Cache-Control", "public, max-age=300");
+    if (res.req.headers["if-none-match"] === etag) {
+      res.status(304).end();
+      return;
+    }
+    res.type("png").send(await this.ctx.renderer.card(state));
   }
 
   @Get(":tokenId/meta")

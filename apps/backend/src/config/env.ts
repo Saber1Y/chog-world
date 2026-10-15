@@ -21,6 +21,8 @@ export const envSchema = z.object({
   /** Interface to bind; 127.0.0.1 when a reverse proxy on the same host fronts the API. */
   HOST: z.string().default("0.0.0.0"),
   CORS_ORIGIN: z.string().default("http://localhost:3100"),
+  /** The public web app, shown on share cards. */
+  SITE_URL: z.string().url().default("http://localhost:3100"),
 
   /** 143 mainnet, 10143 testnet, or an anvil fork of either. */
   CHAIN_ID: z.coerce.number().int().default(10143),
