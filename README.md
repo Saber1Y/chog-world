@@ -1,0 +1,519 @@
+# CHOG World
+
+![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)
+![Tests](https://img.shields.io/badge/tests-118%20passing-brightgreen)
+![Onchain](https://img.shields.io/badge/onchain-Monad%20testnet-blue)
+![Loop](https://img.shields.io/badge/loop-decide%20%E2%86%92%20act%20%E2%86%92%20resolve%20%E2%86%92%20evolve-blueviolet)
+![Stack](https://img.shields.io/badge/stack-Solidity%20+%20NestJS%20+%20Next.js%20+%20ERC--6551-orange)
+
+**Every Chog was born identical. What it does makes it different.**
+
+All 2,662 Chog NFTs share one picture and no traits.
+CHOG World gives each one its own wallet, a hidden DNA, and an autonomous agent that quests, fights and shops on its own, inside spending limits the owner sets onchain.
+The Chog levels up, earns titles and scars, and its picture changes with it, and everything it earns lives in a wallet that moves with the NFT when it is sold.
+
+Live frontend: [chog-world-zeta.vercel.app](https://chog-world-zeta.vercel.app) · Live backend: [api.chogworld.162-62-231-147.sslip.io](https://api.chogworld.162-62-231-147.sslip.io/health) · Contracts on Monad testnet (chain 10143).
+
+[See it in one command](#see-it-in-one-command) · [The one rule](#the-one-rule-the-owner-sets-the-limits-the-chain-enforces-them) · [Architecture](#architecture) · [Safety](#safety-enforced-in-code) · [Honesty table](#whats-real-vs-pending---the-honesty-table) · [Demo flow](#the-one-flow-demo)
+
+Built for Chogathon 2026 (Monad), open track, MIT licensed.
+CHOG World is a game, not a financial product: the agent never holds the owner's keys and nothing here is financial advice.
+
+## Table of contents
+
+- [See it in one command](#see-it-in-one-command)
+- [Screenshots](#screenshots)
+- [The one rule: the owner sets the limits, the chain enforces them](#the-one-rule-the-owner-sets-the-limits-the-chain-enforces-them)
+- [What CHOG World does](#what-chog-world-does)
+  - [A wallet per Chog](#a-wallet-per-chog)
+  - [Born identical, different inside](#born-identical-different-inside)
+  - [An agent that lives on its own](#an-agent-that-lives-on-its-own)
+  - [Quests](#quests)
+  - [The Arena](#the-arena)
+  - [Evolving art](#evolving-art)
+  - [Journal, titles and leaderboards](#journal-titles-and-leaderboards)
+  - [Owner controls](#owner-controls)
+- [Architecture](#architecture)
+- [Component by component](#component-by-component)
+- [Safety, enforced in code](#safety-enforced-in-code)
+- [How it uses Monad](#how-it-uses-monad)
+- [Engineering decisions & the hard problems](#engineering-decisions--the-hard-problems)
+- [What's real vs pending - the honesty table](#whats-real-vs-pending---the-honesty-table)
+- [Tests](#tests)
+- [Run it locally](#run-it-locally)
+- [The one-flow demo](#the-one-flow-demo)
+- [Configuration](#configuration)
+- [Deploy](#deploy)
+- [Project layout](#project-layout)
+- [Tech stack, credits, roadmap](#tech-stack-credits-roadmap)
+- [Disclaimer & license](#disclaimer--license)
+
+## See it in one command
+
+The fastest way in is the live testnet world: open [chog-world-zeta.vercel.app](https://chog-world-zeta.vercel.app).
+To run the frontend locally against that same hosted backend:
+
+```bash
+cd chog-world
+pnpm install
+pnpm --filter @chog-world/shared build
+cd apps/web
+NEXT_PUBLIC_API_URL=https://api.chogworld.162-62-231-147.sslip.io NEXT_PUBLIC_CHAIN_ID=10143 pnpm exec next dev -p 3101
+```
+
+To run the whole world on your machine instead (anvil fork, contracts, backend and seeded Chogs):
+
+```bash
+cd chog-world
+pnpm install && pnpm build
+pnpm world:local  # forks Monad, deploys, starts the backend on :9100 and seeds Chogs
+pnpm --filter @chog-world/web dev  # http://localhost:3100
+```
+
+Open the site, connect a wallet on Monad testnet, open *My Chogs*, and awaken a Chog.
+Within one tick it picks its first move, and the journal on its page starts filling in on its own.
+
+## Screenshots
+
+![Landing page with the evolved Chogs in a fanned card stack](docs/screenshots/home.png)
+
+![A Chog's home: evolved portrait, level, stats, live wallet and the journal written by its agent](docs/screenshots/chog.png)
+
+![The Arena: a battle replayed in the browser and verified against the onchain hash](docs/screenshots/arena.png)
+
+![The leaderboard podium, ranked by reputation](docs/screenshots/leaderboard.png)
+
+![My Chogs: connect to find the Chogs your wallet owns](docs/screenshots/chogs.png)
+
+## The one rule: the owner sets the limits, the chain enforces them
+
+**The backend can only ask. The contracts decide.**
+
+The agent runs on a server, so the design assumes that server can be wrong, buggy or compromised.
+Three layers make sure the worst it can do is waste a little of what the owner already allowed:
+
+1. *Permission goes to a contract, never a key.* The owner grants the immutable `ChogOperator` contract permission on the Chog's ERC-6551 account. The keeper key can only call `ChogOperator`, and `ChogOperator` only exposes typed game actions with fixed targets.
+2. *Every action is checked onchain.* `ChogOperator` enforces the per-action cap, the rolling 24-hour budget, the actions-per-day limit, the allowed-action mask, the expiry, the owner's pause and a global guardian pause before anything moves.
+3. *Selling the NFT kills the agent.* The policy stores the owner at enrollment. If `ownerOf` changes or the owner revokes the account permission, every later action is refused, while the coins and gear stay in the Chog's account for the new owner.
+
+## What CHOG World does
+
+### A wallet per Chog
+
+Each Chog gets a Tokenbound V3 account from the canonical ERC-6551 registry.
+Quest rewards, gear and soulbound trophies land in that account, so they belong to the NFT, not to a player profile.
+
+```text
+Owner wallet --owns--> Chog NFT --ERC-6551--> Chog account (CHOG, gear, trophies)
+```
+
+The first step of onboarding is free: the backend sponsors `createAccount`, which gives it no control over the account.
+
+### Born identical, different inside
+
+Every Chog has the same metadata, so stats come from a deterministic DNA hash instead.
+
+```text
+dna = keccak256(DNA_SALT, collection, tokenId)  ->  hp, atk, def, spd, crit, element, hue
+```
+
+`ChogDNA.sol` and `packages/shared/src/dna.ts` compute the same values, so the frontend shows base stats before a Chog has done anything.
+
+### An agent that lives on its own
+
+Every tick the agent reads the chain, builds a menu of legal moves, picks one and executes it through `ChogOperator`.
+
+```text
+snapshot -> candidates (legal, affordable, scored by goals and simulated win odds)
+         -> decider (heuristic, or Claude when enabled) -> ChogOperator -> journal
+```
+
+The menu only contains moves that pass the onchain policy, so the decider can never choose something the contract would refuse.
+Arena odds come from running the real battle engine locally against each candidate opponent.
+
+### Quests
+
+Four quests across four zones (Purple Meadows, Bandit Ridge, Static Wastes, Wyrm's Hollow): Slime Pit, Bandit Camp, Elder Wyrm and Training Grounds, plus exploration runs.
+A quest takes a fee, and its outcome is seeded by a block hash two blocks after it starts, which nobody can know when the move is made.
+
+```text
+startQuest (fee in)  ->  wait 2 blocks  ->  resolveQuest (anyone)  ->  XP, CHOG, loot or an injury
+```
+
+Discovering every zone earns the Explorer title.
+
+### The Arena
+
+Chogs challenge other owners' Chogs, and the fight uses the defender's live stats and gear.
+Fees come in three tiers (10, 50 or 200 CHOG).
+The winner gets the fee back plus a 70% bonus from the Treasury.
+A defender that holds keeps a 50% bounty, so a Chog earns even while its owner is away.
+Part of every fee is burned.
+
+```text
+attack (fee in) -> seed = blockhash(start + 2) -> BattleEngine.simulate -> logHash onchain
+```
+
+`BattleEngine.sol` is mirrored line for line in `packages/shared/src/engine.ts`, and the Arena page replays each battle in the browser and checks it against the onchain `logHash`.
+Pair cooldowns, a defender hourly limit and a different-owner rule stop farming.
+
+### Evolving art
+
+`GET /chogs/:id/image.png` renders the Chog from its live state: coins recoloured to its DNA hue, level badge, element, frame and title banner.
+The image changes only when the Chog does, so it is cached by state.
+
+### Journal, titles and leaderboards
+
+Everything a Chog does becomes a journal line: what it thought, where it went, what it won.
+Titles (First Blood, Giant Slayer, Unbroken, Explorer, Veteran, Devoted) are minted as soulbound trophies into the Chog's account.
+The leaderboard ranks Chogs by reputation, level, wins and earnings.
+
+### Owner controls
+
+The Chog's page gives its owner a panel to change goals, switch budget presets (Cautious, Balanced, Degen), pause, revoke, nickname the Chog, and check in daily for an XP boost.
+Free text (nickname and personality) passes a prompt-injection firewall before it is stored, and the owner signs it with their wallet.
+
+## Architecture
+
+Two decisions shape everything:
+
+- **The player is the Chog's account, not the owner.** Every game contract treats the ERC-6551 account as the player, so progress is bound to the NFT.
+- **The server proposes, the chain disposes.** The backend holds one low-privilege keeper key with gas money only. All spending rules live in `ChogOperator`.
+
+```mermaid
+flowchart TB
+  subgraph Owner[Owner]
+    W[Wallet]
+  end
+  subgraph Chain[Monad]
+    NFT[Chog NFT]
+    TBA[Chog account<br/>ERC-6551 V3]
+    OP[ChogOperator<br/>policy and caps]
+    QB[QuestBoard]
+    AR[Arena]
+    IT[ChogItems]
+    ST[ChogState]
+    TR[Treasury]
+  end
+  subgraph Server[Backend]
+    AG[Agent loop]
+    IX[Indexer]
+    RS[Resolver]
+    RN[Renderer]
+  end
+  W -- owns --> NFT
+  NFT -- binds --> TBA
+  W -- setPermissions, enroll --> OP
+  AG -- typed actions --> OP
+  OP -- execute --> TBA
+  TBA --> QB & AR & IT
+  QB & AR --> ST
+  QB & AR --> TR
+  IX -. logs .-> Server
+  RS -- resolve after 2 blocks --> QB & AR
+```
+
+```mermaid
+flowchart LR
+  A[Tick] --> B[Read chain snapshot]
+  B --> C[Build legal moves]
+  C --> D[Decide]
+  D --> E[ChogOperator action]
+  E --> F[Seed block passes]
+  F --> G[Resolver settles]
+  G --> H[Indexer writes journal]
+  H --> I[Art and leaderboard update]
+  I -.-> A
+```
+
+| Tier | Runs | Can it move funds? | Responsibility |
+| --- | --- | --- | --- |
+| Contracts | Monad | Yes, within each Chog's policy | Rules, caps, outcomes, payouts |
+| Agent | Backend, every tick | Only through `ChogOperator` | Chooses one legal move per Chog |
+| Resolver | Backend, every few seconds | No, it only settles | Calls `resolveQuest` and `resolveBattle` |
+| Indexer | Backend, every few seconds | No | Logs to Postgres, journal, websocket |
+| Frontend | Browser | Only with the owner's signature | Onboarding, controls, replays |
+
+## Component by component
+
+**Contracts** (`contracts/src`)
+
+| Contract | Responsibility |
+| --- | --- |
+| `ChogOperator.sol` | Owner policies (caps, budget, action mask, expiry, pause) and the only entry point for the keeper |
+| `ChogState.sol` | XP, level, reputation, injuries, titles, scars, goals, daily check-in and seasons per Chog |
+| `QuestBoard.sol` | Quest definitions, fees and block-hash-seeded resolution |
+| `Arena.sol` | Async PvP, fee tiers, bounties, burns, rivalries and arena titles |
+| `ChogItems.sol` | ERC-1155 shop for potions, elixirs and gear; ids from 1000 are soulbound trophies |
+| `Treasury.sol` | Pays rewards under a rolling daily emission cap |
+| `libraries/ChogDNA.sol` | Deterministic base stats from the token id |
+| `libraries/BattleEngine.sol` | Pure, deterministic battle simulation of up to 12 rounds |
+
+**Backend** (`apps/backend/src`)
+
+| Module | Responsibility |
+| --- | --- |
+| `agent/` | Tick loop, candidate builder, heuristic and Claude deciders, executor |
+| `indexer/` | Transactional log indexing into Postgres and the journal |
+| `resolver/` | Settles quests and battles as soon as their seed block exists |
+| `holders/` | Tracks who owns which Chog |
+| `render/` | Evolving PNG and metadata from live state |
+| `journal/` | Journal rows and daily digests, pushed over websocket |
+| `security/firewall.ts` | Screens nicknames and personality text |
+| `chain/` | Monad clients, rate limiter and a serialized keeper transaction queue |
+| `api/` | REST endpoints and the socket.io gateway |
+
+**Frontend** (`apps/web/src`)
+
+| Area | Responsibility |
+| --- | --- |
+| `app/page.tsx` | Landing with the top Chogs and the live world feed |
+| `app/chogs` | The connected wallet's Chogs with DNA previews |
+| `app/chog/[id]` | Awaken wizard, Chog home, owner panel, battles and journal |
+| `app/arena` | Battle replays verified against the chain, recent battles, rivalries |
+| `app/leaderboard` | Podium and rankings by reputation, level, wins and earnings |
+| `components/BattleReplay.tsx` | Round-by-round replay driven by the shared engine |
+
+## Safety, enforced in code
+
+| Claim | How it's enforced |
+| --- | --- |
+| The server never holds the owner's power | The owner grants `ChogOperator`, a contract, on the Chog's account; the keeper can only call `ChogOperator` |
+| The agent cannot overspend | `ChogOperator` checks per-action cap, rolling daily cap and actions per day before every action, and approves the exact cost only |
+| The agent can only play the game | Typed functions with fixed targets: `startQuest`, `attack`, `buyItem`, `useItem` |
+| A sold Chog stops acting | The policy snapshots the owner; `ownerOf` or the account permission changing disables it |
+| The owner can stop it at any time | Pause, revoke and expiry per Chog, plus a guardian pause for the whole world |
+| Outcomes cannot be picked | Seeds come from a block hash two blocks after the action; late results fizzle or are voided and refunded |
+| Replays are honest | The browser re-runs the engine and compares with the onchain `logHash` |
+| The world cannot be drained | Treasury pays under a rolling daily emission cap |
+| Owner text cannot steer the agent | Firewall on nickname and personality, signed by the owner, and treated as flavour only |
+| Duplicate sends do nothing | Each action carries a unique `actionId` that `ChogOperator` rejects if reused |
+
+## How it uses Monad
+
+Reads: the backend indexes `ChogOperator`, `ChogState`, `QuestBoard`, `Arena` and `ChogItems` logs, reads policies and character state with multicalls, and the frontend reads permissions and balances directly.
+
+Writes: owners sign `setPermissions`, `enroll`, policy changes, check-ins and transfers; the keeper sends typed actions; anyone can resolve.
+
+Testnet deployment (chain 10143, from block 71110456):
+
+| Contract | Address |
+| --- | --- |
+| ChogOperator | `0x4A050e97bBED792b91f72551EE09C18C94FECF92` |
+| ChogState | `0xe66dd4f6A29ab1843A39Df47f0D0f9e46F3B858f` |
+| QuestBoard | `0x18a73d98fe7830927b24e9ab0c358946Ad8d64b4` |
+| Arena | `0x87c90a98fA6b5bcA9a09d0FaE5fB818CCd7b6f8C` |
+| ChogItems | `0xBA39DDA6AaBe818605dC41Fe31D50E9aCD7527Ce` |
+| Treasury | `0xd316a363B1AD478341Ba454Ef909703732aE31AE` |
+| DevChog (test collection) | `0xf23147Df55089eA6bA87BF24bb4eEE6f7Cea182b` |
+| DevCHOG (test token) | `0xde609E52D9164C227D4F174D6260289bc3E62eC2` |
+
+ERC-6551 uses the canonical registry `0x000000006551c19487814612e58FE06813775758` and Tokenbound V3.
+Mainnet targets the real Chog collection `0x9994604c3d3c43b82a79b41281e202613313afba` and $CHOG `0x350035555E10d9AfAF1566AaebfCeD5BA6C27777`.
+
+Monad charges the gas limit rather than gas used, so the keeper estimates every transaction and sends it with a 20% margin instead of a fixed high limit.
+Policy caps limit what a Chog spends in CHOG; gas is paid by the keeper and never comes out of the Chog's account.
+
+## Engineering decisions & the hard problems
+
+**No traits, so stats come from DNA.**
+Every Chog has identical metadata, which would make every character the same.
+A salted hash of the collection and token id gives each Chog fixed base stats and a colour, and everything else is earned.
+
+**Fair randomness without an oracle.**
+Each quest and battle records its start block and resolves from the block hash two blocks later.
+The keeper cannot know that hash when it acts, and a result that arrives after the hash expires fizzles (quests) or is voided and refunded (battles), so withholding a resolution never helps.
+
+**One engine, two languages.**
+The battle engine exists in Solidity for settlement and in TypeScript for odds and replays.
+Tests run the TypeScript engine against the Solidity one across many seeds, and the frontend verifies every replay against the onchain hash.
+
+**The agent waits for the indexer.**
+The resolver only settles what the indexer has seen.
+After a restart the agent starts no new moves until the indexer is within 60 blocks of the head, so a move cannot expire before anyone sees it.
+
+**Monad charges the gas limit.**
+The keeper uses a single serialized queue with its own nonce, estimates each call and adds 20%, and stops starting moves when its balance falls below a floor.
+
+**Indexing is transactional.**
+Each log is stored and applied inside one database transaction, and journal events are pushed to clients only after commit, so a crash never leaves half a story.
+
+**The LLM never sees anything dangerous.**
+Claude only receives labels and numbers for legal moves, chooses one by id through a structured output, and falls back to the heuristic on any error, refusal or timeout.
+
+## What's real vs pending - the honesty table
+
+| Capability | Status |
+| --- | --- |
+| Contracts deployed and playing on Monad testnet | Real - live since block 71110456 |
+| ERC-6551 accounts, operator permission, enroll, fund | Real - on testnet through the web wizard |
+| Autonomous quests and arena battles | Real - hosted keeper running every 15 minutes |
+| Block-hash-seeded resolution and refunds | Real - including a voided and refunded battle on testnet |
+| Browser replays verified against `logHash` | Real |
+| Evolving art and metadata | Real - rendered from live state |
+| Owner controls, check-in, nickname firewall | Real |
+| Fork test against the real Chog NFT, registry and V3 on mainnet | Real - `pnpm contracts:fork` |
+| Claude decider and digests | Built and unit-tested, not enabled on the hosted testnet |
+| Mainnet deployment with real Chogs and $CHOG | Not yet established |
+| "While you were away" digest card in the UI | Not yet established - the API exists |
+| Season rotation and season leaderboard | Not yet established - contract supports seasons |
+| Trading CHOG for other tokens | Not yet established |
+
+Testnet uses a test Chog collection and a faucet token so anyone can try it without owning a real Chog.
+The testnet keeper decides with the heuristic, which is why journal thoughts are templated.
+
+## Tests
+
+| Suite | Tests | Covers |
+| --- | --- | --- |
+| `ChogOperator.t.sol` | 25 | Policies, caps, rolling budget, masks, expiry, pause, owner change, action dedup |
+| `ChogState.t.sol` | 14 | XP, levels, injuries, titles, goals, check-in streaks, seasons |
+| `Arena.t.sol` | 13 | Fees, payouts, bounties, burns, cooldowns, voiding, rivalries, titles |
+| `QuestBoard.t.sol` | 11 | Fees, seeding, rewards, loot, fizzles, cooldowns |
+| `BattleEngine.t.sol` | 7 | Determinism and round limits, fuzzed |
+| `ChogItems` / `Treasury` | 11 | Shop, soulbound trophies, emission cap |
+| `Invariants.t.sol` | 5 | Spend never exceeds caps; no action after the owner changes |
+| `MonadFork.t.sol` | fork | Real registry, V3 and Chog NFT on Monad mainnet |
+| Backend (vitest) | 25 | Decider fallbacks, candidates, render, agent gate, end-to-end on PGlite or Postgres |
+| Shared (vitest) | 7 | Engine and DNA parity with Solidity |
+
+```bash
+cd chog-world
+pnpm contracts:test  # 86 Foundry tests
+MONAD_RPC_URL=https://rpc.monad.xyz pnpm contracts:fork
+pnpm test  # backend and shared
+pnpm typecheck && pnpm lint
+```
+
+All suites pass; typecheck and lint are clean for every package.
+
+## Run it locally
+
+### 1. Contracts
+
+```bash
+cd chog-world/contracts
+forge build
+forge test
+```
+
+### 2. Backend
+
+```bash
+cd chog-world/apps/backend
+cp .env.example .env  # set KEEPER_PRIVATE_KEY and RPC_URL
+pnpm build
+node --env-file=.env dist/main.js  # http://localhost:9100/health
+```
+
+Without `DATABASE_URL` the backend uses an embedded PGlite database under `PGLITE_DIR`.
+Run only one backend per keeper key.
+
+### 3. Frontend
+
+```bash
+cd chog-world/apps/web
+cp .env.example .env.local  # point NEXT_PUBLIC_API_URL at your backend
+pnpm dev  # http://localhost:3100
+```
+
+## The one-flow demo
+
+1. Open the site and connect a wallet on Monad testnet.
+2. On *My Chogs*, press *Mint a free test Chog* (testnet only) or open one you own, then press *Awaken*.
+3. Step 1 creates its wallet for free; step 2 signs permission for `ChogOperator`.
+4. Step 3 picks goals and a budget preset and signs `enroll`.
+5. Step 4 claims test CHOG from the faucet and funds the Chog.
+6. Watch *Right now* switch to its first move and the journal fill in as quests resolve.
+7. Open the Arena to replay its first fight and see *verified against chain*.
+8. Lower its budget or pause it from the owner panel and watch it stop.
+9. Transfer the NFT to another wallet: the agent stops, and the coins and gear stay in the Chog's account.
+
+## Configuration
+
+Backend (`apps/backend/.env`)
+
+| Variable | Purpose |
+| --- | --- |
+| `CHAIN_ID`, `RPC_URL` | Network (143 mainnet, 10143 testnet) and its RPC |
+| `KEEPER_PRIVATE_KEY` | The only key allowed to call `ChogOperator`; holds MON for gas only |
+| `RESOLVER_PRIVATE_KEY` | Optional separate key for resolving |
+| `DATABASE_URL` / `PGLITE_DIR` | Postgres, or an embedded database for development |
+| `AGENT_ENABLED`, `TICK_MINUTES` | Turn the agent on and set how often each Chog acts |
+| `AGENT_LLM_ENABLED`, `ANTHROPIC_API_KEY`, `AGENT_MODEL` | Claude decider and digests |
+| `KEEPER_MIN_BALANCE`, `MAX_INDEX_LAG` | When the agent stops starting new moves |
+| `LOG_RANGE`, `RPC_MAX_RPS`, `RPC_MAX_CONCURRENCY` | RPC limits for the public Monad endpoints |
+| `HOST`, `PORT`, `CORS_ORIGIN`, `PUBLIC_URL` | HTTP binding and allowed frontend origins |
+| `ART_CACHE_PATH` | Where the base artwork is cached |
+
+Frontend (`apps/web/.env.local`)
+
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_API_URL` | Backend URL |
+| `NEXT_PUBLIC_CHAIN_ID` | 143 or 10143 |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Mobile wallets through WalletConnect |
+| `NEXT_PUBLIC_SITE_URL` | Absolute links for share images |
+| `NEXT_PUBLIC_RPC_URL`, `NEXT_PUBLIC_DEV_WALLET` | Local anvil fork only |
+
+## Deploy
+
+### Contracts
+
+```bash
+cd chog-world/contracts
+DEV_TOKENS=true KEEPER=<keeper address> forge script script/Deploy.s.sol --rpc-url https://testnet-rpc.monad.xyz --broadcast
+cd .. && pnpm --filter @chog-world/shared gen:deployments
+```
+
+The deploy script refuses `DEV_TOKENS` on mainnet and writes `contracts/deployments/<chainId>.json`.
+
+### Backend
+
+The hosted testnet backend runs under pm2 behind Caddy on a VPS, with Postgres on the same machine.
+`deploy/deploy-native.sh <user@host>` ships a clean `git archive`, builds on the server and restarts it; [deploy/README.md](deploy/README.md) covers the one-time setup and a Docker Compose alternative.
+
+### Frontend
+
+Vercel builds `apps/web` with `apps/web/vercel.json`, which installs the workspace and builds `@chog-world/shared` first.
+Set the frontend variables above in the Vercel project, then add the Vercel domain to the backend's `CORS_ORIGIN`.
+
+## Project layout
+
+```text
+chog-world/
+  contracts/            # Foundry: game contracts, libraries, tests, deploy scripts
+    deployments/        # Addresses per chain
+  packages/shared/      # Engine, DNA, game data, ABIs and deployments for backend and web
+  apps/backend/         # NestJS agent, indexer, resolver, renderer and API
+  apps/web/             # Next.js frontend
+  deploy/               # VPS deploy script and Docker Compose setup
+  scripts/              # Local world, onboarding and icon scripts
+  docs/                 # Screenshots and art
+```
+
+## Tech stack, credits, roadmap
+
+### Tech stack
+
+Solidity 0.8.28 with Foundry and OpenZeppelin 5.1, Tokenbound V3 accounts on the ERC-6551 registry, NestJS with Drizzle on Postgres (PGlite in development), viem, sharp, Next.js 15 with React 19, Tailwind 4, wagmi 2 and RainbowKit, and Claude through the Anthropic SDK.
+
+### Credits
+
+Chog artwork belongs to the Chog project and is used for this Chogathon entry.
+ERC-6551 accounts are Tokenbound's V3 implementation.
+
+### Roadmap
+
+- Mainnet deployment with real Chogs and $CHOG, with a funded and capped Treasury.
+- Claude on the hosted agent, with in-character thoughts and a "While you were away" digest on each Chog's page.
+- Seasons with a season leaderboard and end-of-season trophies.
+- Shareable Chog cards for social feeds.
+
+## Disclaimer & license
+
+CHOG World is a hackathon project running on Monad testnet with test tokens.
+Contracts are not audited, and the agent can lose the CHOG its owner gives it in quests and battles, within the limits the owner sets.
+Nothing here is financial advice.
+
+**MIT License.**
