@@ -81,6 +81,13 @@ describe("LlmDecider", () => {
     expect(text).toContain("<personality>Greedy but cautious. Hates slime.</personality>");
   });
 
+  it("heuristic tells the owner how to get a resting Chog going again", () => {
+    const rest = (reason: string): Candidate[] => [{ id: "rest", kind: "rest", cost: 0n, label: "Rest: x", score: 0.05, facts: { reason } }];
+    expect(heuristic(ctx, rest("needs CHOG")).thought).toContain("Send me some CHOG");
+    expect(heuristic(ctx, rest("needs MON for gas")).thought).toContain("MON");
+    expect(heuristic(ctx, rest("done for today")).thought).toContain("tomorrow");
+  });
+
   it("heuristic picks the highest score", () => {
     expect(heuristic(ctx, cands).candidate.id).toBe("quest-0");
   });

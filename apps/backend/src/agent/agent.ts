@@ -121,9 +121,13 @@ export class Agent {
     const decision = candidates.length > 1 ? await this.decider.decide(ctx, candidates) : heuristic(ctx, candidates);
     const { actionId, outcome } = await this.executor.execute(s.key, tokenId, decision, randomUUID());
 
-    // Consecutive rests are one story beat, not one per tick: skip a rest that follows a rest.
+    // Consecutive identical rests are one story beat, not one per tick; a new reason to rest is news.
     const latest = (await this.journal.list(s.key, { limit: 1 }))[0];
-    const repeatRest = outcome.status === "rested" && latest?.kind === "thought" && (latest.data as { kind?: string } | null)?.kind === "rest";
+    const repeatRest =
+      outcome.status === "rested" &&
+      latest?.kind === "thought" &&
+      (latest.data as { kind?: string } | null)?.kind === "rest" &&
+      latest.title === decision.thought;
     if (!repeatRest) await this.journal.write({
       chogKey: s.key,
       kind: "thought",

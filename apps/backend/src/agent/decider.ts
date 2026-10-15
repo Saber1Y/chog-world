@@ -52,13 +52,28 @@ export function heuristic(ctx: DecisionContext, candidates: Candidate[], fallbac
     candidate: best,
     thought:
       best.kind === "rest"
-        ? best.facts.reason
-          ? `${best.label}. Top up my wallet with MON and I will get back to it.`
-          : "Nothing worth the risk right now. Resting."
+        ? restThought(best)
         : `${best.label}: ${why}.`,
     decidedBy: "heuristic",
     ...(fallbackReason ? { fallbackReason } : {}),
   };
+}
+
+/** What a resting Chog says, depending on why it rests. */
+function restThought(rest: Candidate): string {
+  switch (rest.facts.reason) {
+    case "needs MON for gas":
+      return `${rest.label}. Top up my wallet with MON and I will get back to it.`;
+    case "gas fee above owner limit":
+      return `${rest.label}. Raise my gas limit and I will get back to it.`;
+    case "needs CHOG":
+      return `${rest.label}. Send me some CHOG and I will get back out there.`;
+    case "budget spent":
+    case "done for today":
+      return `${rest.label}. Back at it tomorrow.`;
+    default:
+      return "Nothing worth the risk right now. Resting.";
+  }
 }
 
 /** Which of the owner's goals a candidate serves best, for the heuristic's explanation. */

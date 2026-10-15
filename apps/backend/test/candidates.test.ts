@@ -47,6 +47,18 @@ describe("buildCandidates", () => {
     expect(buildCandidates(s, [rival]).map((c) => c.id)).toEqual(["rest"]);
   });
 
+  it("says why it rests when it cannot afford anything", () => {
+    const done = snap();
+    done.policy.actionsLeft = 0;
+    expect(buildCandidates(done, [rival])[0]).toMatchObject({ facts: { reason: "done for today" } });
+
+    expect(buildCandidates(snap({ balance: 0n }), [rival])[0]).toMatchObject({ label: "Rest: no CHOG left to pay quest or arena fees", facts: { reason: "needs CHOG" } });
+
+    const spent = snap();
+    spent.policy.remaining = 0n;
+    expect(buildCandidates(spent, [rival])[0]).toMatchObject({ facts: { reason: "budget spent" } });
+  });
+
   it("an injured Chog only heals or rests", () => {
     const now = 1_800_000_000;
     const withPotion = buildCandidates(snap({ items: { 1: 1 } as never }, { injuredUntil: now + 600 }), [rival]);

@@ -139,7 +139,25 @@ export function penalizeRepeats(cands: Candidate[], recent: string[]): Candidate
 }
 
 export function buildCandidates(s: ChogSnapshot, opponents: OpponentView[], recent: string[] = []): Candidate[] {
-  return penalizeRepeats(menu(s, opponents), recent);
+  return explainRest(s, penalizeRepeats(menu(s, opponents), recent));
+}
+
+/** Why a Chog with nothing but rest on its menu is resting, in words its owner can act on. */
+const REST_REASONS: Record<string, string> = {
+  "done for today": "Rest: I have made all my moves for today",
+  "needs CHOG": "Rest: no CHOG left to pay quest or arena fees",
+  "budget spent": "Rest: today's budget is spent",
+};
+
+function explainRest(s: ChogSnapshot, cands: Candidate[]): Candidate[] {
+  const rest = cands[0];
+  if (cands.length > 1 || !rest || rest.kind !== "rest" || rest.facts.reason) return cands;
+  if (s.character.injuredUntil > s.blockTime) return cands;
+  const cheapest = QUESTS.reduce((m, q) => (q.fee < m ? q.fee : m), QUESTS[0]!.fee);
+  const reason =
+    s.policy.actionsLeft <= 0 ? "done for today" : s.balance < cheapest ? "needs CHOG" : s.policy.remaining < cheapest ? "budget spent" : "";
+  if (!reason) return cands;
+  return [{ ...rest, label: REST_REASONS[reason]!, facts: { reason } }];
 }
 
 function menu(s: ChogSnapshot, opponents: OpponentView[]): Candidate[] {
