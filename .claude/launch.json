@@ -32,6 +32,15 @@
         "3101"
       ],
       "port": 3101
+    },
+    {
+      "name": "web-hosted",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/web && NEXT_PUBLIC_API_URL=https://api.chogworld.162-62-231-147.sslip.io NEXT_PUBLIC_CHAIN_ID=10143 NEXT_PUBLIC_RPC_URL= NEXT_PUBLIC_DEV_WALLET=false NEXT_PUBLIC_SITE_URL=http://localhost:3101 NEXT_DIST_DIR=.next-testnet exec ./node_modules/.bin/next dev -p ${PORT:-3101}"
+      ],
+      "port": 3101
     }
   ]
 }
