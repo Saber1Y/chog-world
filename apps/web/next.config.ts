@@ -21,6 +21,8 @@ const nextConfig: NextConfig = {
       "@x402/evm/exact/client": false,
       "@x402/evm/upto/client": false,
       "@x402/svm/exact/client": false,
+      // MetaMask's SDK imports React Native storage for its mobile build; browsers never load it.
+      "@react-native-async-storage/async-storage": false,
     };
     return config;
   },
