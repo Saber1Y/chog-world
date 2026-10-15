@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CHOG, ActionKind } from "@chog-world/shared";
-import { buildCandidates, spendable } from "../src/agent/candidates.js";
+import { buildCandidates, moveKey, REPEAT_PENALTY, spendable } from "../src/agent/candidates.js";
 import type { ChogSnapshot, OpponentView } from "../src/world/reader.js";
 import { screen } from "../src/security/firewall.js";
 
@@ -81,6 +81,26 @@ describe("buildCandidates", () => {
   it("does not attack opponents the Arena would refuse", () => {
     const ids = buildCandidates(snap(), [{ ...rival, attackable: false, blockedBy: "pair cooldown" }]).map((c) => c.id);
     expect(ids.some((id) => id.startsWith("attack"))).toBe(false);
+  });
+
+  it("lowers the score of moves it made recently, once per repeat", () => {
+    const fresh = buildCandidates(snap(), [rival]);
+    const quest = fresh.find((c) => c.kind === "quest")!;
+    const key = moveKey("quest", { questId: (quest as { questId: number }).questId });
+    const tired = buildCandidates(snap(), [rival], [key, "quest-99", key]);
+    const again = tired.find((c) => c.id === quest.id)!;
+    expect(again.score).toBeCloseTo(quest.score - 2 * REPEAT_PENALTY);
+    expect(again.facts.doneRecently).toBe(2);
+    // Rest and other moves are untouched.
+    expect(tired.find((c) => c.id === "rest")!.score).toBe(fresh.find((c) => c.id === "rest")!.score);
+  });
+
+  it("treats every tier against the same opponent as one move", () => {
+    const tired = buildCandidates(snap(), [rival], [moveKey("attack", { defender: "2", tier: 0 })]);
+    const fresh = buildCandidates(snap(), [rival]);
+    for (const c of tired.filter((c) => c.kind === "attack")) {
+      expect(c.score).toBeCloseTo(fresh.find((f) => f.id === c.id)!.score - REPEAT_PENALTY);
+    }
   });
 
   it("goals shift the ranking: an explorer prefers new zones", () => {

@@ -70,7 +70,61 @@ export function spendable(s: ChogSnapshot): bigint {
   return max;
 }
 
-export function buildCandidates(s: ChogSnapshot, opponents: OpponentView[]): Candidate[] {
+/** How many recent moves count against a repeat, and how much each repeat costs in score. */
+export const REPEAT_WINDOW = 4;
+export const REPEAT_PENALTY = 0.35;
+
+/**
+ * Identity of a move for repeat detection: the same quest, the same opponent (any tier) or the same
+ * item. Built from a candidate or from a stored action's kind and params, so both compare equal.
+ */
+export function moveKey(kind: string, params: Record<string, unknown>): string {
+  switch (kind) {
+    case "quest":
+      return `quest-${String(params.questId)}`;
+    case "attack":
+      return `attack-${String(params.defender)}`;
+    case "buy":
+    case "use":
+      return `${kind}-${String(params.itemId)}`;
+    default:
+      return kind;
+  }
+}
+
+function candidateKey(c: Candidate): string {
+  switch (c.kind) {
+    case "quest":
+      return moveKey("quest", { questId: c.questId });
+    case "attack":
+      return moveKey("attack", { defender: c.tokenId.toString() });
+    case "buy":
+    case "use":
+      return moveKey(c.kind, { itemId: c.itemId });
+    case "rest":
+      return "rest";
+  }
+}
+
+/**
+ * A Chog that does the same thing over and over is dull to watch, so each recent repeat of a move
+ * lowers its score. `recent` holds move keys of the latest executed moves, newest first.
+ */
+export function penalizeRepeats(cands: Candidate[], recent: string[]): Candidate[] {
+  const window = recent.slice(0, REPEAT_WINDOW);
+  return cands.map((c) => {
+    if (c.kind === "rest") return c;
+    const key = candidateKey(c);
+    const repeats = window.filter((k) => k === key).length;
+    return repeats ? { ...c, score: c.score - REPEAT_PENALTY * repeats, facts: { ...c.facts, doneRecently: repeats } } : c;
+  });
+}
+
+export function buildCandidates(s: ChogSnapshot, opponents: OpponentView[], recent: string[] = []): Candidate[] {
+  return penalizeRepeats(menu(s, opponents), recent);
+}
+
+function menu(s: ChogSnapshot, opponents: OpponentView[]): Candidate[] {
   const w = goalWeights(s.character.goalMask);
   const out: Candidate[] = [
     { id: "rest", kind: "rest", cost: 0n, label: "Rest and wait for a better moment", score: 0.05, facts: {} },
