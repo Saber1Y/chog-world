@@ -195,9 +195,9 @@ export const QUEST_SEED_DELAY_BLOCKS = 2;
 export const BLOCKHASH_WINDOW = 256;
 
 export const POLICY_PRESETS = {
-  CAUTIOUS: { label: "Cautious", dailyCap: 50n * CHOG, maxPerAction: 15n * CHOG, maxActionsPerDay: 12 },
-  BALANCED: { label: "Balanced", dailyCap: 150n * CHOG, maxPerAction: 60n * CHOG, maxActionsPerDay: 24 },
-  DEGEN: { label: "Degen", dailyCap: 500n * CHOG, maxPerAction: 200n * CHOG, maxActionsPerDay: 48 },
+  CAUTIOUS: { label: "Cautious", dailyCap: 50n * CHOG, maxPerAction: 15n * CHOG, maxActionsPerDay: 3 },
+  BALANCED: { label: "Balanced", dailyCap: 150n * CHOG, maxPerAction: 60n * CHOG, maxActionsPerDay: 6 },
+  DEGEN: { label: "Degen", dailyCap: 500n * CHOG, maxPerAction: 200n * CHOG, maxActionsPerDay: 12 },
 } as const;
 export type PolicyPresetKey = keyof typeof POLICY_PRESETS;
 
