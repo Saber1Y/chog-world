@@ -32,4 +32,12 @@ describe("Agent spend gate", () => {
     expect(agent.nextTickMinutes("blocked", 24)).toBe(60);
     expect(agent.nextTickMinutes("failed", 24)).toBe(2);
   });
+
+  it("has no pilot set when the pilot is uncapped", async () => {
+    const untouched = {} as never;
+    const agent = new Agent(untouched, untouched, untouched, untouched, untouched, untouched, {
+      tickMinutes: 15, movesPerDay: 6, restMinutes: 60, pilotMax: 0, batchSize: 20, scoutCount: 6,
+    });
+    expect(await agent.pilotKeys()).toBeNull();
+  });
 });

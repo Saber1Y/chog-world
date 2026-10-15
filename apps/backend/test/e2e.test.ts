@@ -19,6 +19,9 @@ import {
 import { accountV3Abi, chogOperatorAbi, chogStateAbi, EXTERNAL, monadTestnet, policyParams, simulate, Goal, type Stats } from "@chog-world/shared";
 import { loadEnv } from "../src/config/env.js";
 import { buildContext, type AppContext } from "../src/app/context.js";
+import { Agent, PILOT_FULL } from "../src/agent/agent.js";
+import { HeuristicDecider } from "../src/agent/decider.js";
+import { Executor } from "../src/agent/executor.js";
 import { actions, battles, chogs, questRuns } from "../src/database/schema.js";
 import { eq } from "drizzle-orm";
 
@@ -226,6 +229,17 @@ describe("M1: autonomous loop end to end on a Monad testnet fork", () => {
     const s = await ctx.reader.snapshot(1n);
     expect(s.policy.dailyCap - s.policy.remaining).toBeLessThanOrEqual(s.policy.dailyCap);
     expect(s.policy.actionsToday).toBeLessThanOrEqual(s.policy.maxActionsPerDay);
+  });
+
+  it("a capped pilot serves only the first Chogs awakened", async () => {
+    const capped = new Agent(ctx.dbHandle.db, ctx.reader, new HeuristicDecider(), new Executor(ctx.dbHandle.db, ctx.chain.keeper, ctx.chain.deployment), ctx.journal, ctx.chain.deployment, {
+      tickMinutes: 15, movesPerDay: 6, restMinutes: 60, pilotMax: 1, batchSize: 20, scoutCount: 6,
+    });
+    const pilot = await capped.pilotKeys();
+    expect(pilot?.size).toBe(1);
+    expect(pilot?.has(await ctx.reader.keyOf(1n))).toBe(true);
+    const results = await capped.sweep(new Date(Date.now() + 30 * 24 * 3_600_000));
+    expect(results.find((r) => r.tokenId === 2n)).toMatchObject({ status: "skipped", note: PILOT_FULL });
   });
 
   it("a Chog with an empty gas tank rests instead of sending a transaction", async () => {

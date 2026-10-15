@@ -20,6 +20,8 @@ export interface AgentConfig {
   movesPerDay: number;
   /** How long a Chog waits after resting before it reconsiders. */
   restMinutes: number;
+  /** Serve only the first this-many Chogs ever awakened (0 = everyone). Bounds cost during a pilot. */
+  pilotMax?: number;
   /** Chogs handled per sweep, so one sweep never runs unbounded. */
   batchSize: number;
   /** Opponents scouted per tick. */
@@ -28,6 +30,9 @@ export interface AgentConfig {
 
 /** Says whether the keeper can afford new moves; when not, the reason to log. */
 export type SpendGate = () => Promise<{ ok: true } | { ok: false; reason: string }>;
+
+/** Note for a Chog outside the pilot; the web app shows it as the reason it is not acting. */
+export const PILOT_FULL = "pilot is full";
 
 export type TickResult =
   | { tokenId: bigint; status: "skipped"; note: string }
@@ -69,8 +74,14 @@ export class Agent {
         .where(and(eq(chogs.enrolled, true), lte(chogs.nextTickAt, now)))
         .orderBy(asc(chogs.nextTickAt))
         .limit(this.cfg.batchSize);
+      const pilot = await this.pilotKeys();
       const results: TickResult[] = [];
       for (const row of due) {
+        if (pilot && !pilot.has(row.key)) {
+          await this.reschedule(row.key, PILOT_FULL, 24 * 60);
+          results.push({ tokenId: BigInt(row.tokenId), status: "skipped", note: PILOT_FULL });
+          continue;
+        }
         try {
           results.push(await this.tick(BigInt(row.tokenId)));
         } catch (err) {
@@ -154,6 +165,16 @@ export class Agent {
     await this.reschedule(s.key, note, this.nextTickMinutes(outcome.status, s.policy.maxActionsPerDay));
     if (outcome.status !== "rested") this.log(`#${tokenId} ${note}`);
     return { tokenId, status: outcome.status, note };
+  }
+
+  /**
+   * Keys of the Chogs in the pilot (the first `pilotMax` ever awakened), or null when there is no cap.
+   */
+  async pilotKeys(): Promise<Set<string> | null> {
+    const max = this.cfg.pilotMax ?? 0;
+    if (max <= 0) return null;
+    const rows = await this.db.select({ key: chogs.key }).from(chogs).orderBy(asc(chogs.createdAt), asc(chogs.key)).limit(max);
+    return new Set(rows.map((r) => r.key));
   }
 
   /** Minutes until this Chog acts again: a failed send retries soon, a move waits its share of the day. */

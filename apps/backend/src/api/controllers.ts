@@ -79,14 +79,17 @@ export class WorldController {
   }
 
   @Get("config")
-  config() {
+  async config() {
     const { env, chain } = this.ctx;
+    const pilot = await this.ctx.agent.pilotKeys();
     return {
       chainId: chain.chain.id,
       deployment: chain.deployment,
       keeper: chain.keeper.account.address,
       tickMinutes: env.TICK_MINUTES,
       llmEnabled: this.ctx.llmEnabled,
+      // Set during a capped launch: how many Chogs the agent serves and how many places are taken.
+      pilot: pilot ? { max: env.PILOT_MAX_CHOGS, joined: pilot.size } : null,
     };
   }
 
@@ -170,10 +173,20 @@ export class ChogsController {
     const tokenId = tokenIdParam(raw);
     const snapshot = await this.snapshotOr404(tokenId);
     const [row] = await this.ctx.dbHandle.db.select().from(chogs).where(eq(chogs.key, snapshot.key));
+    const pilot = await this.ctx.agent.pilotKeys();
     return json({
       ...snapshot,
       profile: row ? { nickname: row.nickname, personality: row.personality } : null,
-      agent: row ? { enrolled: row.enrolled, nextTickAt: row.nextTickAt, lastTickAt: row.lastTickAt, lastTickNote: row.lastTickNote } : null,
+      agent: row
+        ? {
+            enrolled: row.enrolled,
+            nextTickAt: row.nextTickAt,
+            lastTickAt: row.lastTickAt,
+            lastTickNote: row.lastTickNote,
+            // False only during a capped pilot that this Chog did not get into.
+            inPilot: !pilot || pilot.has(row.key),
+          }
+        : null,
       earned: row?.earned ?? "0",
     });
   }

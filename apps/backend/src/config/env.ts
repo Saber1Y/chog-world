@@ -77,6 +77,8 @@ export const envSchema = z.object({
   LOG_RANGE: z.coerce.number().int().min(1).max(10_000).default(100),
   /** Most moves a Chog makes per day, however much its policy allows; spaced evenly to keep keeper gas bounded. */
   MOVES_PER_DAY: z.coerce.number().int().min(1).max(96).default(12),
+  /** Serve only the first N Chogs ever awakened (0 = no cap): bounds keeper cost and risk in a pilot. */
+  PILOT_MAX_CHOGS: z.coerce.number().int().min(0).default(0),
   /** Minutes a Chog waits after resting before it reconsiders. */
   REST_MINUTES: z.coerce.number().int().min(1).default(60),
   /** Gas limit headroom over the estimate, in basis points. Monad charges the whole limit, so keep it small. */
