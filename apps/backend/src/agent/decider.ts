@@ -1,8 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { GOAL_LABELS, Goal, type GoalKey } from "@chog-world/shared";
 import { rank, type Candidate } from "./candidates.js";
+import { ModelError, type TextModel } from "../llm/models.js";
 
 export interface Decision {
   candidate: Candidate;
@@ -96,12 +95,9 @@ How to choose:
 
 Write the thought as the Chog, first person, one or two short sentences, at most 200 characters. No ids, no addresses.`;
 
-export class ClaudeDecider implements Decider {
-  constructor(
-    private readonly client: Anthropic,
-    private readonly model: string,
-    private readonly timeoutMs: number,
-  ) {}
+/** Lets a language model (Gemini, OpenRouter, Claude, or a chain of them) choose from the menu. */
+export class LlmDecider implements Decider {
+  constructor(private readonly model: TextModel) {}
 
   async decide(ctx: DecisionContext, candidates: Candidate[]): Promise<Decision> {
     const options = rank(candidates).slice(0, MAX_OPTIONS);
@@ -114,39 +110,16 @@ export class ClaudeDecider implements Decider {
     });
 
     try {
-      const response = await this.client.beta.messages.parse(
-        {
-          model: this.model,
-          max_tokens: 2_000,
-          betas: ["server-side-fallback-2026-07-01"],
-          fallbacks: "default",
-          system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-          messages: [{ role: "user", content: describe(ctx, options) }],
-          output_config: { effort: "low", format: betaZodOutputFormat(Choice) },
-        },
-        { timeout: this.timeoutMs, maxRetries: 1 },
-      );
-
-      if (response.stop_reason === "refusal") return heuristic(ctx, candidates, "model declined");
-      if (response.stop_reason === "max_tokens") return heuristic(ctx, candidates, "model ran out of tokens");
-      const parsed = response.parsed_output;
-      if (!parsed) return heuristic(ctx, candidates, "unparseable output");
+      const parsed = await this.model.json({ system: SYSTEM_PROMPT, user: describe(ctx, options), maxTokens: 2_000, schemaName: "choice", schema: Choice });
       const chosen = options.find((c) => c.id === parsed.candidateId);
       if (!chosen) return heuristic(ctx, candidates, "unknown candidate");
-      return { candidate: chosen, thought: parsed.thought.trim().slice(0, 200), decidedBy: "llm" };
+      const thought = parsed.thought.trim().slice(0, 200);
+      if (!thought) return heuristic(ctx, candidates, "empty thought");
+      return { candidate: chosen, thought, decidedBy: "llm" };
     } catch (err) {
-      return heuristic(ctx, candidates, errorLabel(err));
+      return heuristic(ctx, candidates, err instanceof ModelError ? err.label : "model unavailable");
     }
   }
-}
-
-function errorLabel(err: unknown): string {
-  if (err instanceof Anthropic.APIConnectionTimeoutError) return "model timed out";
-  if (err instanceof Anthropic.RateLimitError) return "model rate limited";
-  if (err instanceof Anthropic.AuthenticationError) return "model credentials rejected";
-  if (err instanceof Anthropic.BadRequestError) return "model rejected the request";
-  if (err instanceof Anthropic.APIError) return `model error ${err.status ?? ""}`.trim();
-  return "model unavailable";
 }
 
 /** The per-tick situation. Plain numbers and labels only: no addresses, keys or raw wei. */
