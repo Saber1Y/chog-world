@@ -395,4 +395,125 @@ contract ChogOperatorTest is ChogWorldBase {
         vm.prank(newKeeper);
         assertTrue(w.operator.startQuest(address(nft), ALICE_CHOG, SLIME, aid));
     }
+
+    // ---------------------------------------------------------------------
+    // Gas fee: each Chog pays the keeper for its own moves
+    // ---------------------------------------------------------------------
+
+    uint8 internal constant QUEST_KIND = 0;
+    uint8 internal constant ATTACK_KIND = 1;
+    uint8 internal constant USE_KIND = 3;
+
+    function _setGasFee(uint8 kind, uint128 fee) internal {
+        vm.prank(admin);
+        w.operator.setGasFee(kind, fee);
+    }
+
+    function _allowGasFee(uint128 maxFee) internal {
+        ChogOperator.PolicyParams memory p = _defaultPolicy();
+        p.maxGasFee = maxFee;
+        vm.prank(alice);
+        w.operator.updatePolicy(address(nft), ALICE_CHOG, p);
+    }
+
+    function test_GasFeeIsPaidFromTheChogAccountToTheKeeper() public {
+        _setGasFee(QUEST_KIND, 0.1 ether);
+        _allowGasFee(0.2 ether);
+        vm.deal(aliceAcc, 1 ether);
+
+        vm.expectEmit(address(w.operator));
+        emit ChogOperator.GasFeePaid(_key(ALICE_CHOG), keeper, 0.1 ether);
+        (bool ok,) = _quest(SLIME);
+
+        assertTrue(ok);
+        assertEq(aliceAcc.balance, 0.9 ether);
+        assertEq(w.operator.gasFeesOwed(keeper), 0.1 ether);
+
+        uint256 keeperBefore = keeper.balance;
+        vm.prank(keeper);
+        assertEq(w.operator.withdrawGasFees(), 0.1 ether);
+        assertEq(keeper.balance, keeperBefore + 0.1 ether);
+        assertEq(w.operator.gasFeesOwed(keeper), 0);
+        assertEq(address(w.operator).balance, 0);
+    }
+
+    function test_AKeeperThatRejectsMonCannotBreakMoves() public {
+        RejectsMon picky = new RejectsMon();
+        vm.prank(admin);
+        w.operator.setKeeper(address(picky));
+        _setGasFee(QUEST_KIND, 0.1 ether);
+        _allowGasFee(0.1 ether);
+        vm.deal(aliceAcc, 1 ether);
+
+        vm.prank(address(picky));
+        assertTrue(w.operator.startQuest(address(nft), ALICE_CHOG, SLIME, _aid()), "the move succeeds; the fee waits to be pulled");
+        assertEq(w.operator.gasFeesOwed(address(picky)), 0.1 ether);
+    }
+
+    function test_NobodyCanSendMonToTheOperatorDirectly() public {
+        vm.deal(alice, 1 ether);
+        vm.prank(alice);
+        (bool ok,) = address(w.operator).call{value: 0.1 ether}("");
+        assertFalse(ok);
+    }
+
+    function test_GasFeeAboveTheOwnerLimitIsRefusedAndNothingMoves() public {
+        _setGasFee(QUEST_KIND, 0.1 ether);
+        vm.deal(aliceAcc, 1 ether); // the default policy allows no gas fee at all
+        uint256 chogBefore = chog.balanceOf(aliceAcc);
+
+        (bool ok, string memory reason) = _quest(SLIME);
+
+        assertFalse(ok);
+        assertEq(reason, "gas fee above owner limit");
+        assertEq(aliceAcc.balance, 1 ether);
+        assertEq(chog.balanceOf(aliceAcc), chogBefore);
+        assertEq(w.operator.policyOf(address(nft), ALICE_CHOG).actionsToday, 0);
+    }
+
+    function test_ChogWithoutMonForGasRests() public {
+        _setGasFee(QUEST_KIND, 0.1 ether);
+        _allowGasFee(0.1 ether);
+        vm.deal(aliceAcc, 0.05 ether);
+
+        (bool ok, string memory reason) = _quest(SLIME);
+
+        assertFalse(ok);
+        assertEq(reason, "needs MON for gas");
+        assertEq(aliceAcc.balance, 0.05 ether);
+    }
+
+    function test_GasFeeIsPerActionKind() public {
+        _setGasFee(QUEST_KIND, 0.1 ether);
+        _setGasFee(USE_KIND, 0);
+        assertEq(w.operator.gasFee(QUEST_KIND), 0.1 ether);
+        assertEq(w.operator.gasFee(ATTACK_KIND), 0);
+    }
+
+    function test_OnlyTheGuardianSetsGasFeesAndNeverAboveTheCeiling() public {
+        uint128 ceiling = w.operator.MAX_GAS_FEE();
+        vm.prank(alice);
+        vm.expectRevert(ChogOperator.NotGuardian.selector);
+        w.operator.setGasFee(QUEST_KIND, 0.1 ether);
+
+        vm.startPrank(admin);
+        vm.expectRevert(ChogOperator.BadGasFee.selector);
+        w.operator.setGasFee(QUEST_KIND, ceiling + 1);
+        vm.expectRevert(ChogOperator.BadGasFee.selector);
+        w.operator.setGasFee(4, 0.1 ether);
+        w.operator.setGasFee(QUEST_KIND, ceiling);
+        vm.stopPrank();
+        assertEq(w.operator.gasFee(QUEST_KIND), ceiling);
+    }
+
+    function test_EnrollStoresTheOwnerGasLimit() public {
+        _allowGasFee(0.25 ether);
+        assertEq(w.operator.policyOf(address(nft), ALICE_CHOG).maxGasFee, 0.25 ether);
+    }
+}
+
+contract RejectsMon {
+    receive() external payable {
+        revert("no thanks");
+    }
 }

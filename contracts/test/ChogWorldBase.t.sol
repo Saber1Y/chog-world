@@ -114,7 +114,7 @@ abstract contract ChogWorldBase is Test, ChogWorldDeployer {
 
     function _defaultPolicy() internal pure returns (ChogOperator.PolicyParams memory) {
         return ChogOperator.PolicyParams({
-            expiry: 0, actionMask: 0x0f, maxActionsPerDay: 20, maxPerAction: 60 ether, dailyCap: 150 ether
+            expiry: 0, actionMask: 0x0f, maxActionsPerDay: 20, maxPerAction: 60 ether, dailyCap: 150 ether, maxGasFee: 0
         });
     }
 

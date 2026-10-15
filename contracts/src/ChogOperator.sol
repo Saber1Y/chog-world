@@ -17,6 +17,12 @@ import {ChogItems} from "./ChogItems.sol";
 ///         Non-upgradeable, game targets fixed at construction, no arbitrary calls: the keeper can only
 ///         ask for typed actions. If the NFT changes hands the policy stops working immediately, because
 ///         it is bound to the owner who signed it.
+///
+///         Gas: every move costs the keeper gas (to start it and to settle it). Each executed move moves a
+///         fixed gas fee in MON from the Chog's account into this contract, credited to the keeper, so every
+///         Chog pays its own way. The fee is set per action kind by the guardian, can never exceed
+///         MAX_GAS_FEE, and is refused unless it is within the `maxGasFee` the owner signed in their policy.
+///         Fees are pulled (`withdrawGasFees`), never pushed, so the recipient can never make a move fail.
 contract ChogOperator {
     uint8 public constant ACTION_QUEST = 0;
     uint8 public constant ACTION_ATTACK = 1;
@@ -25,6 +31,8 @@ contract ChogOperator {
     uint8 public constant ALL_ACTIONS = 0x0f;
 
     uint256 private constant DAY = 1 days;
+    /// @notice Hard ceiling on the per-move gas fee, whatever the guardian sets.
+    uint128 public constant MAX_GAS_FEE = 0.5 ether;
     uint8 private constant CALL = 0;
 
     struct PolicyParams {
@@ -33,6 +41,7 @@ contract ChogOperator {
         uint16 maxActionsPerDay;
         uint128 maxPerAction;
         uint128 dailyCap;
+        uint128 maxGasFee; // most MON the owner pays the keeper per move; 0 = only free moves
     }
 
     struct Policy {
@@ -47,6 +56,7 @@ contract ChogOperator {
         uint128 maxPerAction;
         uint128 dailyCap;
         uint128 spentToday;
+        uint128 maxGasFee;
     }
 
     ChogState public immutable state;
@@ -58,6 +68,12 @@ contract ChogOperator {
 
     address public keeper;
     bool public guardianPaused;
+    /// @notice MON paid to the keeper per executed move, by action kind.
+    mapping(uint8 kind => uint128) public gasFee;
+    /// @notice Gas fees collected and not yet withdrawn, by the keeper that made the moves.
+    mapping(address keeper => uint256) public gasFeesOwed;
+    /// @dev Set only while a Chog's account pays its gas fee, so no one can send MON here by mistake.
+    bool private transient _collecting;
 
     mapping(bytes32 key => Policy) internal _policies;
     mapping(bytes32 actionId => bool) public usedAction;
@@ -71,6 +87,9 @@ contract ChogOperator {
     event ActionBlocked(bytes32 indexed key, uint8 indexed kind, uint256 cost, bytes32 actionId, string reason);
     event KeeperSet(address indexed keeper);
     event GuardianPausedSet(bool paused);
+    event GasFeeSet(uint8 indexed kind, uint128 fee);
+    event GasFeePaid(bytes32 indexed key, address indexed keeper, uint256 amount);
+    event GasFeesWithdrawn(address indexed keeper, uint256 amount);
 
     error NotChogOwner();
     error NotEnrolled();
@@ -78,6 +97,9 @@ contract ChogOperator {
     error NotGuardian();
     error GuardianPaused();
     error BadPolicy();
+    error BadGasFee();
+    error UnexpectedPayment();
+    error WithdrawFailed();
 
     modifier onlyKeeper() {
         if (msg.sender != keeper) revert NotKeeper();
@@ -132,7 +154,8 @@ contract ChogOperator {
             actionsToday: 0,
             maxPerAction: params.maxPerAction,
             dailyCap: params.dailyCap,
-            spentToday: 0
+            spentToday: 0,
+            maxGasFee: params.maxGasFee
         });
         emit Enrolled(key, msg.sender, state.accountOf(collection, tokenId), params);
     }
@@ -145,6 +168,7 @@ contract ChogOperator {
         p.maxActionsPerDay = params.maxActionsPerDay;
         p.maxPerAction = params.maxPerAction;
         p.dailyCap = params.dailyCap;
+        p.maxGasFee = params.maxGasFee;
         emit PolicyUpdated(state.keyOf(collection, tokenId), params);
     }
 
@@ -226,6 +250,19 @@ contract ChogOperator {
         );
     }
 
+    /// @notice Withdraw the gas fees owed to the caller (the keeper, or a former keeper).
+    function withdrawGasFees() external returns (uint256 amount) {
+        amount = gasFeesOwed[msg.sender];
+        gasFeesOwed[msg.sender] = 0;
+        emit GasFeesWithdrawn(msg.sender, amount);
+        (bool ok,) = msg.sender.call{value: amount}("");
+        if (!ok) revert WithdrawFailed();
+    }
+
+    receive() external payable {
+        if (!_collecting) revert UnexpectedPayment();
+    }
+
     // ---------------------------------------------------------------------
     // Admin (guardian)
     // ---------------------------------------------------------------------
@@ -233,6 +270,12 @@ contract ChogOperator {
     function setKeeper(address keeper_) external onlyGuardian {
         keeper = keeper_;
         emit KeeperSet(keeper_);
+    }
+
+    function setGasFee(uint8 kind, uint128 fee) external onlyGuardian {
+        if (kind > ACTION_USE || fee > MAX_GAS_FEE) revert BadGasFee();
+        gasFee[kind] = fee;
+        emit GasFeeSet(kind, fee);
     }
 
     function setGuardianPaused(bool paused) external onlyGuardian {
@@ -309,6 +352,15 @@ contract ChogOperator {
         account.execute(target, 0, data, CALL);
         if (cost > 0) account.execute(address(chog), 0, abi.encodeCall(IERC20.approve, (target, 0)), CALL);
 
+        uint256 fee = gasFee[kind];
+        if (fee > 0) {
+            _collecting = true;
+            account.execute(address(this), fee, "", CALL);
+            _collecting = false;
+            gasFeesOwed[keeper] += fee;
+            emit GasFeePaid(key, keeper, fee);
+        }
+
         emit ActionExecuted(key, kind, cost, actionId);
         return true;
     }
@@ -337,6 +389,9 @@ contract ChogOperator {
         if (!IAccountV3(account).permissions(p.owner, address(this))) return "permission not granted";
 
         if (cost > p.maxPerAction) return "exceeds maxPerAction";
+        uint256 fee = gasFee[kind];
+        if (fee > p.maxGasFee) return "gas fee above owner limit";
+        if (account.balance < fee) return "needs MON for gas";
         if (block.timestamp >= uint256(p.windowStart) + DAY) {
             p.windowStart = uint64(block.timestamp);
             p.spentToday = 0;

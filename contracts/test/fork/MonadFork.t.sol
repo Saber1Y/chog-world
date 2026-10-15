@@ -85,7 +85,7 @@ contract MonadForkTest is Test, ChogWorldDeployer {
                 CHOG_NFT,
                 TOKEN_ID,
                 ChogOperator.PolicyParams({
-                    expiry: 0, actionMask: 0x0f, maxActionsPerDay: 20, maxPerAction: 60 ether, dailyCap: 150 ether
+                    expiry: 0, actionMask: 0x0f, maxActionsPerDay: 20, maxPerAction: 60 ether, dailyCap: 150 ether, maxGasFee: 0
                 }),
                 0
             );
@@ -114,6 +114,28 @@ contract MonadForkTest is Test, ChogWorldDeployer {
         w.quests.resolveQuest(CHOG_NFT, TOKEN_ID);
         assertGt(w.state.character(w.state.keyOf(CHOG_NFT, TOKEN_ID)).xp, 0);
 
+        // Owner-paid gas: the real V3 account pays the keeper in MON for each move, within the owner's limit.
+        vm.prank(admin);
+        w.operator.setGasFee(0, 0.1 ether);
+        ChogOperator.PolicyParams memory withGas = ChogOperator.PolicyParams({
+            expiry: 0, actionMask: 0x0f, maxActionsPerDay: 20, maxPerAction: 60 ether, dailyCap: 150 ether, maxGasFee: 0.1 ether
+        });
+        vm.prank(owner);
+        w.operator.updatePolicy(CHOG_NFT, TOKEN_ID, withGas);
+        vm.deal(account, 1 ether);
+        uint256 keeperBefore = keeper.balance;
+        vm.prank(keeper);
+        assertTrue(w.operator.startQuest(CHOG_NFT, TOKEN_ID, 7, keccak256("fork-gas")));
+        assertEq(w.operator.gasFeesOwed(keeper), 0.1 ether, "fee collected from the Chog's account");
+        vm.prank(keeper);
+        w.operator.withdrawGasFees();
+        assertEq(keeper.balance - keeperBefore, 0.1 ether, "keeper repaid");
+        assertEq(account.balance, 0.9 ether);
+        _mine(3);
+        w.quests.resolveQuest(CHOG_NFT, TOKEN_ID);
+        vm.prank(admin);
+        w.operator.setGasFee(0, 0);
+
         // The real V3 account accepts ERC-1155 gear.
         vm.prank(keeper);
         assertTrue(w.operator.buyItem(CHOG_NFT, TOKEN_ID, 11, 1, keccak256("fork-2")));
@@ -138,7 +160,8 @@ contract MonadForkTest is Test, ChogWorldDeployer {
         vm.expectRevert();
         IAccountV3(account).execute(address(CHOG), 0, abi.encodeCall(IERC20.transfer, (owner, 1 ether)), 0);
 
-        // The new owner can hand the Chog to the agent again.
+        // The new owner can hand the Chog to the agent again (after quest 7's cooldown from the gas check).
+        vm.warp(block.timestamp + 1 days);
         _grantAndEnroll(buyer);
         vm.prank(keeper);
         assertTrue(w.operator.startQuest(CHOG_NFT, TOKEN_ID, 7, keccak256("fork-4")));

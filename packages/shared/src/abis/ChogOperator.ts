@@ -37,6 +37,10 @@ export const chogOperatorAbi = [
     "stateMutability": "nonpayable"
   },
   {
+    "type": "receive",
+    "stateMutability": "payable"
+  },
+  {
     "type": "function",
     "name": "ACTION_ATTACK",
     "inputs": [],
@@ -97,6 +101,19 @@ export const chogOperatorAbi = [
         "name": "",
         "type": "uint8",
         "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_GAS_FEE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint128",
+        "internalType": "uint128"
       }
     ],
     "stateMutability": "view"
@@ -253,6 +270,11 @@ export const chogOperatorAbi = [
             "name": "dailyCap",
             "type": "uint128",
             "internalType": "uint128"
+          },
+          {
+            "name": "maxGasFee",
+            "type": "uint128",
+            "internalType": "uint128"
           }
         ]
       },
@@ -264,6 +286,44 @@ export const chogOperatorAbi = [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "gasFee",
+    "inputs": [
+      {
+        "name": "kind",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint128",
+        "internalType": "uint128"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "gasFeesOwed",
+    "inputs": [
+      {
+        "name": "keeper",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -440,6 +500,11 @@ export const chogOperatorAbi = [
             "name": "spentToday",
             "type": "uint128",
             "internalType": "uint128"
+          },
+          {
+            "name": "maxGasFee",
+            "type": "uint128",
+            "internalType": "uint128"
           }
         ]
       }
@@ -496,6 +561,24 @@ export const chogOperatorAbi = [
         "name": "tokenId",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setGasFee",
+    "inputs": [
+      {
+        "name": "kind",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "fee",
+        "type": "uint128",
+        "internalType": "uint128"
       }
     ],
     "outputs": [],
@@ -640,6 +723,11 @@ export const chogOperatorAbi = [
             "name": "dailyCap",
             "type": "uint128",
             "internalType": "uint128"
+          },
+          {
+            "name": "maxGasFee",
+            "type": "uint128",
+            "internalType": "uint128"
           }
         ]
       }
@@ -699,6 +787,19 @@ export const chogOperatorAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "withdrawGasFees",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "event",
@@ -820,8 +921,76 @@ export const chogOperatorAbi = [
             "name": "dailyCap",
             "type": "uint128",
             "internalType": "uint128"
+          },
+          {
+            "name": "maxGasFee",
+            "type": "uint128",
+            "internalType": "uint128"
           }
         ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "GasFeePaid",
+    "inputs": [
+      {
+        "name": "key",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "keeper",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "GasFeeSet",
+    "inputs": [
+      {
+        "name": "kind",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "uint8"
+      },
+      {
+        "name": "fee",
+        "type": "uint128",
+        "indexed": false,
+        "internalType": "uint128"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "GasFeesWithdrawn",
+    "inputs": [
+      {
+        "name": "keeper",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -936,6 +1105,11 @@ export const chogOperatorAbi = [
             "name": "dailyCap",
             "type": "uint128",
             "internalType": "uint128"
+          },
+          {
+            "name": "maxGasFee",
+            "type": "uint128",
+            "internalType": "uint128"
           }
         ]
       }
@@ -954,6 +1128,11 @@ export const chogOperatorAbi = [
       }
     ],
     "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "BadGasFee",
+    "inputs": []
   },
   {
     "type": "error",
@@ -983,6 +1162,16 @@ export const chogOperatorAbi = [
   {
     "type": "error",
     "name": "NotKeeper",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UnexpectedPayment",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WithdrawFailed",
     "inputs": []
   }
 ] as const;

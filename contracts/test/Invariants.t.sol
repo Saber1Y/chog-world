@@ -97,7 +97,7 @@ contract OperatorHandler is Test {
             address(nft),
             tokenId,
             ChogOperator.PolicyParams({
-                expiry: 0, actionMask: 0x0f, maxActionsPerDay: 20, maxPerAction: 60 ether, dailyCap: 150 ether
+                expiry: 0, actionMask: 0x0f, maxActionsPerDay: 20, maxPerAction: 60 ether, dailyCap: 150 ether, maxGasFee: 0
             }),
             0
         );
