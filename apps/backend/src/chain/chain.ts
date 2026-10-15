@@ -57,7 +57,8 @@ export function revertReason(err: unknown): string {
 
 /**
  * Sends transactions for one key strictly one at a time (simulate, send, wait), so nonces never race.
- * Monad charges for the gas limit, not gas used, so the limit is the estimate plus 20%, never a blanket ceiling.
+ * Monad charges for the gas limit, not gas used, so the limit is the estimate plus a small margin
+ * (`marginBps`), never a blanket ceiling.
  */
 export class TxSender {
   private tail: Promise<unknown> = Promise.resolve();
@@ -66,6 +67,7 @@ export class TxSender {
     private readonly publicClient: PublicClient,
     readonly wallet: WalletClient,
     readonly account: Account,
+    private readonly marginBps = 1_000,
   ) {}
 
   send(req: { address: Address; abi: Abi; functionName: string; args: readonly unknown[] }): Promise<SendResult> {
@@ -74,7 +76,7 @@ export class TxSender {
       const estimate = await this.publicClient.estimateContractGas({ ...req, account: this.account } as never);
       const hash = await this.wallet.writeContract({
         ...(request as object),
-        gas: (estimate * 12n) / 10n,
+        gas: (estimate * BigInt(10_000 + this.marginBps)) / 10_000n,
         account: this.account,
         chain: this.wallet.chain,
       } as never);
@@ -128,11 +130,11 @@ export class ChainService {
     }
     const resolverAccount = env.RESOLVER_PRIVATE_KEY ? privateKeyToAccount(env.RESOLVER_PRIVATE_KEY) : keeperAccount;
 
-    this.keeper = new TxSender(this.publicClient, createWalletClient({ chain, transport, account: keeperAccount }), keeperAccount);
+    this.keeper = new TxSender(this.publicClient, createWalletClient({ chain, transport, account: keeperAccount }), keeperAccount, env.GAS_MARGIN_BPS);
     this.resolver =
       resolverAccount === keeperAccount
         ? this.keeper
-        : new TxSender(this.publicClient, createWalletClient({ chain, transport, account: resolverAccount }), resolverAccount);
+        : new TxSender(this.publicClient, createWalletClient({ chain, transport, account: resolverAccount }), resolverAccount, env.GAS_MARGIN_BPS);
   }
 
   keeperBalance(): Promise<bigint> {
