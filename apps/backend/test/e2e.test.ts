@@ -132,6 +132,8 @@ describe("M1: autonomous loop end to end on a Monad testnet fork", () => {
       DEPLOYMENT_JSON: deploymentPath,
       KEEPER_PRIVATE_KEY: KEEPER_KEY,
       PGLITE_DIR: dataDir,
+      // E2E_DATABASE_URL runs the same test against real Postgres (the production driver).
+      ...(process.env.E2E_DATABASE_URL ? { DATABASE_URL: process.env.E2E_DATABASE_URL } : {}),
       AGENT_LLM_ENABLED: "false",
       AGENT_ENABLED: "true",
       LOG_RANGE: "1000",
