@@ -36,5 +36,9 @@
     "socket.io": "^4.8.4",
     "viem": "^2.57.4",
     "zod": "^4.6.6"
-  }
+  },
+  "files": [
+    "dist",
+    "migrations"
+  ]
 }

@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/.next-*
+**/dist
+**/.data
+.secrets
+**/.env
+**/.env.*
+!**/.env.example
+contracts/out
+contracts/cache
+contracts/lib
+contracts/broadcast
+.git
