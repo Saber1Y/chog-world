@@ -18,6 +18,7 @@ import {
 } from "@chog-world/shared";
 import { api, type ChogView } from "@/lib/api";
 import { isTestnet } from "@/lib/config";
+import { useWorldConfig } from "@/hooks/useWorld";
 import { chog as fmtChog } from "@/lib/format";
 import { gasTank, isFunded, mon } from "@/lib/gas";
 import { GasTopUp } from "./GasTopUp";
@@ -62,6 +63,8 @@ export function AwakenWizard({ chog, deployment }: { chog: ChogView; deployment:
   const signaturesLeft = STEPS.filter((s) => s.id !== "account" && !done[s.id]).length;
   const name = chog.profile?.nickname ?? `Chog #${chog.tokenId}`;
   const returning = chog.character.awakened;
+  const pilot = useWorldConfig().data?.pilot;
+  const pilotFull = !!pilot && pilot.joined >= pilot.max && !chog.agent?.inPilot;
 
   return (
     <section className="sticker bg-night-2 p-6 sm:p-8" aria-labelledby="awaken-title">
@@ -72,6 +75,13 @@ export function AwakenWizard({ chog, deployment }: { chog: ChogView; deployment:
         {signaturesLeft === 1 ? "One signature" : `${signaturesLeft} signatures`} and it starts living on its own. You can stop here and come back:
         progress is saved onchain.
       </p>
+
+      {pilotFull && (
+        <p className="mt-4 rounded-xl border-2 border-gold/60 bg-gold/10 px-4 py-3 text-sm">
+          <span className="font-bold text-gold">The pilot is full.</span> The first {pilot!.max} Chogs are playing right now. You can still awaken yours,
+          but its agent won&apos;t act until a place opens, so hold off on funding it.
+        </p>
+      )}
 
       <ol className="mt-8 space-y-4">
         {STEPS.map((s, i) => {
@@ -337,6 +347,16 @@ function FundStep({ chog, deployment, onDone }: { chog: ChogView; deployment: De
             >
               Send {amount || "0"} CHOG
             </PrimaryButton>
+            {!isTestnet && (
+              <a
+                href={`https://nad.fun/tokens/${deployment.chogToken}`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-xl px-3 py-2 text-sm font-bold text-gold underline decoration-dotted underline-offset-4 hover:text-paper"
+              >
+                Buy $CHOG on nad.fun
+              </a>
+            )}
             {isTestnet && (
               <button
                 type="button"

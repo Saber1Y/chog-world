@@ -216,6 +216,7 @@ function statusHeadline(c: ChogView, reason: string, tank: GasTank, injured: boo
   if (reason === "owner changed") return "Changed hands: its agent stood down";
   if (reason === "paused") return "Paused by its owner";
   if (reason) return `Not acting: ${reason}`;
+  if (c.agent?.inPilot === false) return "Waiting: the pilot is full";
   // Something already in flight matters more than whether it can afford the next move.
   if (c.activeRunId !== "0") return "Out on a quest";
   if (c.pendingBattleId !== "0") return "Fighting in the Arena";

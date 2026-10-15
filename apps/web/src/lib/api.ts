@@ -37,6 +37,8 @@ export interface WorldConfig {
   keeper: Address;
   tickMinutes: number;
   llmEnabled: boolean;
+  /** Set during a capped launch: how many Chogs the agent serves and how many places are taken. */
+  pilot: { max: number; joined: number } | null;
 }
 
 export interface OwnedChog {
@@ -99,7 +101,7 @@ export interface ChogView {
   pendingBattleId: string;
   blockTime: number;
   profile: { nickname: string | null; personality: string | null } | null;
-  agent: { enrolled: boolean; nextTickAt: string; lastTickAt: string | null; lastTickNote: string | null } | null;
+  agent: { enrolled: boolean; nextTickAt: string; lastTickAt: string | null; lastTickNote: string | null; inPilot: boolean } | null;
   earned: string;
 }
 
