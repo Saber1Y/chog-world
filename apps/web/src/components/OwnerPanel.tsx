@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAccount, useReadContract, useSignMessage, useWriteContract } from "wagmi";
+import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
-import { encodeFunctionData, erc20Abi, parseUnits, type Hex } from "viem";
+import { encodeFunctionData, erc20Abi, parseUnits } from "viem";
 import {
   accountV3Abi,
   chogOperatorAbi,
@@ -13,16 +13,15 @@ import {
   PERSONALITY_MAX,
   policyParams,
   normalizeProfileText,
-  profileMessage,
   type Deployment,
   type PolicyPresetKey,
 } from "@chog-world/shared";
 import { api, type ChogView } from "@/lib/api";
-import { appChain } from "@/lib/config";
 import { chog as fmtChog, untilLabel } from "@/lib/format";
 import { gasTank, mon } from "@/lib/gas";
 import { GasTopUp } from "./GasTopUp";
-import { useTx, txErrorMessage, type TxState } from "@/hooks/useTx";
+import { useTx, type TxState } from "@/hooks/useTx";
+import { useSaveProfile } from "@/hooks/useSaveProfile";
 import { TxStatus } from "./TxStatus";
 import { GoalPicker, PresetPicker, presetOf } from "./PolicyPickers";
 
@@ -519,10 +518,9 @@ function AmountInput({ label, value, onChange }: { label: string; value: string;
 // ---------------------------------------------------------------------------
 
 function ProfileTab({ chog, onDone }: { chog: ChogView; onDone: () => void }) {
-  const { signMessageAsync } = useSignMessage();
+  const { state, save } = useSaveProfile(chog.tokenId);
   const [nickname, setNickname] = useState(chog.profile?.nickname ?? "");
   const [personality, setPersonality] = useState(chog.profile?.personality ?? "");
-  const [state, setState] = useState<{ status: "idle" | "signing" | "saving" | "saved" } | { status: "error"; message: string }>({ status: "idle" });
   const n = normalizeProfileText(nickname) || null;
   const p = normalizeProfileText(personality) || null;
   const unchanged = n === (chog.profile?.nickname ?? null) && p === (chog.profile?.personality ?? null);
@@ -532,18 +530,7 @@ function ProfileTab({ chog, onDone }: { chog: ChogView; onDone: () => void }) {
       className="space-y-4"
       onSubmit={async (e) => {
         e.preventDefault();
-        const issuedAt = new Date().toISOString();
-        try {
-          setState({ status: "signing" });
-          const message = profileMessage({ chainId: appChain.id, tokenId: BigInt(chog.tokenId), nickname: n, personality: p, issuedAt });
-          const signature = (await signMessageAsync({ message })) as Hex;
-          setState({ status: "saving" });
-          await api.setProfile(chog.tokenId, { nickname: n, personality: p, issuedAt, signature });
-          setState({ status: "saved" });
-          onDone();
-        } catch (err) {
-          setState({ status: "error", message: txErrorMessage(err) });
-        }
+        if (await save(nickname, personality)) onDone();
       }}
     >
       <p className="text-sm text-muted">

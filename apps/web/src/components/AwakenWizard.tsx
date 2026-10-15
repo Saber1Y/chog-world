@@ -9,6 +9,9 @@ import {
   chogOperatorAbi,
   DEFAULT_MAX_GAS_FEE,
   Goal,
+  NICKNAME_MAX,
+  normalizeProfileText,
+  PERSONALITY_MAX,
   policyParams,
   type Deployment,
   type PolicyPresetKey,
@@ -16,8 +19,9 @@ import {
 import { api, type ChogView } from "@/lib/api";
 import { isTestnet } from "@/lib/config";
 import { chog as fmtChog } from "@/lib/format";
-import { gasTank, mon } from "@/lib/gas";
+import { gasTank, isFunded, mon } from "@/lib/gas";
 import { GasTopUp } from "./GasTopUp";
+import { useSaveProfile } from "@/hooks/useSaveProfile";
 import { useTx } from "@/hooks/useTx";
 import { TxStatus } from "./TxStatus";
 import { GoalPicker, PresetPicker } from "./PolicyPickers";
@@ -28,7 +32,7 @@ type StepId = "account" | "permission" | "enroll" | "fund";
 const STEPS: { id: StepId; title: string; blurb: string }[] = [
   { id: "account", title: "Give it a wallet", blurb: "Your Chog gets its own wallet, bound to the NFT. It will hold its coins, gear and trophies." },
   { id: "permission", title: "Let it act", blurb: "Allow CHOG World's rule contract to act for your Chog. Never our server, and you can revoke it any time." },
-  { id: "enroll", title: "Goals and budget", blurb: "Tell it what to chase and how much it may spend per day. The limits are enforced onchain." },
+  { id: "enroll", title: "Name, goals and budget", blurb: "Name it, tell it what to chase and how much it may spend per day. The limits are enforced onchain." },
   { id: "fund", title: "Fund it", blurb: "Send it CHOG for quest and arena fees, and a little MON so it pays its own gas. Whatever it earns stays in its wallet." },
 ];
 
@@ -46,8 +50,7 @@ export function AwakenWizard({ chog, deployment }: { chog: ChogView; deployment:
   });
 
   const enrolled = chog.policy.active && chog.policy.owner.toLowerCase() === address?.toLowerCase();
-  const tank = gasTank(chog);
-  const funded = BigInt(chog.balance) > 0n && (!tank.charges || tank.balance >= tank.maxFee);
+  const funded = isFunded(chog);
   const done: Record<StepId, boolean> = {
     account: chog.accountDeployed,
     permission: permission.data === true,
@@ -182,10 +185,41 @@ function EnrollStep({ chog, deployment, onDone }: { chog: ChogView; deployment: 
   const tx = useTx();
   const [goals, setGoals] = useState<number>(Goal.MONEY | Goal.STRONGEST);
   const [preset, setPreset] = useState<PolicyPresetKey>("BALANCED");
+  const [nickname, setNickname] = useState(chog.profile?.nickname ?? "");
+  const [personality, setPersonality] = useState(chog.profile?.personality ?? "");
+  const profile = useSaveProfile(chog.tokenId);
   const tank = gasTank(chog);
+  const profileChanged =
+    (normalizeProfileText(nickname) || null) !== (chog.profile?.nickname ?? null) ||
+    (normalizeProfileText(personality) || null) !== (chog.profile?.personality ?? null);
+  const working = tx.state.status === "signing" || tx.state.status === "pending" || tx.state.status === "done";
+  const savingProfile = profile.state.status === "signing" || profile.state.status === "saving";
 
   return (
     <div className="space-y-6">
+      <fieldset className="space-y-3">
+        <legend className="mb-2 font-bold">
+          Name it <span className="font-normal text-muted">(optional, you can change it later)</span>
+        </legend>
+        <input
+          aria-label="Nickname"
+          value={nickname}
+          maxLength={NICKNAME_MAX}
+          onChange={(e) => setNickname(e.target.value)}
+          placeholder={`Chog #${chog.tokenId}`}
+          className="w-full rounded-xl border-[3px] border-ink bg-night px-3 py-2"
+        />
+        <textarea
+          aria-label="Personality"
+          value={personality}
+          maxLength={PERSONALITY_MAX}
+          onChange={(e) => setPersonality(e.target.value)}
+          rows={2}
+          placeholder="Personality, e.g. Greedy but cautious. Hates slime. Never backs down from a rival."
+          className="w-full resize-none rounded-xl border-[3px] border-ink bg-night px-3 py-2"
+        />
+        <p className="text-xs text-muted">The personality shapes how it thinks and talks. Saving it is a free signature, nothing onchain.</p>
+      </fieldset>
       <GoalPicker value={goals} onChange={setGoals} />
       <PresetPicker value={preset} onChange={setPreset} />
       {tank.charges && (
@@ -198,8 +232,10 @@ function EnrollStep({ chog, deployment, onDone }: { chog: ChogView; deployment: 
 
       <div className="space-y-2">
         <PrimaryButton
-          busy={tx.state.status === "signing" || tx.state.status === "pending" || tx.state.status === "done"}
+          busy={working || savingProfile}
           onClick={async () => {
+            // The name is a free signature: save it first so a cancelled signature never strands an enrolled Chog nameless.
+            if (profileChanged && !(await profile.save(nickname, personality))) return;
             const ok = await tx.run(() =>
               writeContractAsync({
                 address: deployment.operator,
@@ -211,8 +247,12 @@ function EnrollStep({ chog, deployment, onDone }: { chog: ChogView; deployment: 
             if (ok) onDone();
           }}
         >
-          Set goals and budget
+          {profileChanged ? "Save name, goals and budget" : "Set goals and budget"}
         </PrimaryButton>
+        <p className="text-sm" aria-live="polite">
+          {profile.state.status === "signing" && <span className="text-gold">Sign the name in your wallet (free)…</span>}
+          {profile.state.status === "error" && <span className="text-danger">{profile.state.message}</span>}
+        </p>
         <TxStatus state={tx.state} />
       </div>
     </div>
@@ -240,8 +280,15 @@ function FundStep({ chog, deployment, onDone }: { chog: ChogView; deployment: De
   const hasChog = BigInt(chog.balance) > 0n;
   const needsGas = tank.charges && tank.balance < tank.maxFee;
 
+  const missing = [!hasChog && "CHOG for its quest and arena fees", needsGas && "MON for its gas"].filter(Boolean);
+
   return (
     <div className="space-y-6">
+      {missing.length > 0 && (
+        <p className="rounded-xl border-2 border-gold/60 bg-gold/10 px-3 py-2 text-sm">
+          <span className="font-bold text-gold">Still needed:</span> {missing.join(" and ")}. It can&apos;t make a move without {missing.length > 1 ? "both" : "it"}.
+        </p>
+      )}
       {tank.charges && <p className="text-sm font-bold text-paper">{hasChog ? "✓ " : ""}CHOG for fees</p>}
       {hasChog ? (
         <p className="text-sm text-muted">It has {fmtChog(chog.balance)} CHOG.</p>
