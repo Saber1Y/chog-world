@@ -3,12 +3,12 @@ import { JetBrains_Mono, Lilita_One, Rubik } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Header } from "@/components/Header";
+import { SITE_URL } from "@/lib/config";
 
 const lilita = Lilita_One({ weight: "400", subsets: ["latin"], variable: "--font-lilita" });
 const rubik = Rubik({ subsets: ["latin"], variable: "--font-rubik" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3100";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

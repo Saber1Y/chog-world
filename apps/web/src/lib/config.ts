@@ -2,6 +2,8 @@ import { monad, monadTestnet } from "@chog-world/shared";
 import type { Chain } from "viem";
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:9100").replace(/\/$/, "");
+/** The public site, for absolute links in metadata and shares. */
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3100").replace(/\/$/, "");
 export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? monadTestnet.id);
 /** Optional RPC override, e.g. a local anvil fork from scripts/local-world.mjs. */
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
