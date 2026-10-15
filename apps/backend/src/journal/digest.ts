@@ -1,8 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { and, desc, eq, gte } from "drizzle-orm";
 import type { Database } from "../database/db.js";
 import { digests } from "../database/schema.js";
 import type { Journal, JournalRow } from "./journal.js";
+import type { TextModel } from "../llm/models.js";
 
 export type DigestRow = typeof digests.$inferSelect;
 
@@ -18,12 +18,12 @@ Write 2 to 4 short sentences in the Chog's voice, first person, playful but hone
 - Lead with what matters most: titles, level-ups, rivalries, big wins or losses, money earned, being stopped by policy.
 - Plain text only: no lists, no headings, no emoji.`;
 
-/** A digest written from journal rows only. Claude narrates; facts come exclusively from the rows. */
+/** A digest written from journal rows only. A language model narrates; facts come exclusively from the rows. */
 export class Digests {
   constructor(
     private readonly db: Database,
     private readonly journal: Journal,
-    private readonly llm: { client: Anthropic; model: string; timeoutMs: number } | null,
+    private readonly llm: TextModel | null,
   ) {}
 
   async latest(chogKey: string): Promise<DigestRow | undefined> {
@@ -59,25 +59,8 @@ export class Digests {
     if (this.llm) {
       try {
         const facts = rows.map((r) => `- ${r.createdAt.toISOString().slice(0, 16).replace("T", " ")}: ${r.title}${r.body ? ` (${r.body})` : ""}`).join("\n");
-        const response = await this.llm.client.beta.messages.create(
-          {
-            model: this.llm.model,
-            max_tokens: 1_500,
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-            system: [{ type: "text", text: DIGEST_SYSTEM, cache_control: { type: "ephemeral" } }],
-            messages: [{ role: "user", content: `Journal entries:\n${facts}` }],
-            output_config: { effort: "low" },
-          },
-          { timeout: this.llm.timeoutMs, maxRetries: 1 },
-        );
-        if (response.stop_reason !== "refusal" && response.stop_reason !== "max_tokens") {
-          const text = response.content
-            .flatMap((b) => (b.type === "text" ? [b.text] : []))
-            .join(" ")
-            .trim();
-          if (text) return { text, writtenBy: "llm" };
-        }
+        const text = await this.llm.text({ system: DIGEST_SYSTEM, user: `Journal entries:\n${facts}`, maxTokens: 1_500 });
+        return { text: text.slice(0, 800), writtenBy: "llm" };
       } catch {
         // Fall through to the template: the digest is a nicety and must never fail the page.
       }
