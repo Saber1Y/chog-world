@@ -18,9 +18,14 @@ export function Header() {
     <header className="sticky top-0 z-30 border-b-[3px] border-ink bg-night/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
         <Link href="/" className="group flex items-center gap-2" aria-label="CHOG World home">
-          <span className="sticker grid size-9 shrink-0 place-items-center bg-monad font-display text-lg text-paper transition-transform group-hover:-rotate-6 sm:size-10 sm:text-xl">
-            C
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- tiny static SVG, no optimisation needed */}
+          <img
+            src="/brand/chog-icon.svg"
+            alt=""
+            width={40}
+            height={40}
+            className="size-9 shrink-0 drop-shadow-[2px_2px_0_var(--ink)] transition-transform duration-200 group-hover:-rotate-6 sm:size-10"
+          />
           <span className="whitespace-nowrap font-display text-xl tracking-wide sm:text-2xl">
             CHOG <span className="text-gold">WORLD</span>
           </span>
