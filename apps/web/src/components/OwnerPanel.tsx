@@ -8,10 +8,10 @@ import {
   accountV3Abi,
   chogOperatorAbi,
   chogStateAbi,
-  ALL_ACTIONS,
+  DEFAULT_MAX_GAS_FEE,
   NICKNAME_MAX,
   PERSONALITY_MAX,
-  POLICY_PRESETS,
+  policyParams,
   normalizeProfileText,
   profileMessage,
   type Deployment,
@@ -20,6 +20,8 @@ import {
 import { api, type ChogView } from "@/lib/api";
 import { appChain } from "@/lib/config";
 import { chog as fmtChog, untilLabel } from "@/lib/format";
+import { gasTank, mon } from "@/lib/gas";
+import { GasTopUp } from "./GasTopUp";
 import { useTx, txErrorMessage, type TxState } from "@/hooks/useTx";
 import { TxStatus } from "./TxStatus";
 import { GoalPicker, PresetPicker, presetOf } from "./PolicyPickers";
@@ -190,6 +192,10 @@ function AgentTab({ chog, deployment, onDone }: { chog: ChogView; deployment: De
   });
   const granted = permission.data === true;
   const paused = chog.policy.paused;
+  const tank = gasTank(chog);
+  // Saving a budget keeps the owner's gas limit; a Chog enrolled before gas fees gets the default.
+  const maxGasFee = BigInt(chog.policy.maxGasFee) > 0n ? BigInt(chog.policy.maxGasFee) : DEFAULT_MAX_GAS_FEE;
+  const gasLimitTx = useTx();
 
   return (
     <div className="space-y-6">
@@ -212,6 +218,36 @@ function AgentTab({ chog, deployment, onDone }: { chog: ChogView; deployment: De
               Allow the agent again
             </ActionButton>
             <TxStatus state={grantTx.state} />
+          </div>
+        </div>
+      )}
+
+      {tank.overLimit && (
+        <div className="rounded-2xl border-[3px] border-gold/60 bg-gold/10 p-4">
+          <p className="font-bold">Moves now cost up to {mon(tank.maxFee)} MON in gas, more than the {mon(chog.policy.maxGasFee)} MON per move you allowed.</p>
+          <p className="mt-1 text-sm text-muted">Your Chog rests until you allow it. It pays from its own wallet, never from yours.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <ActionButton
+              pending={busy(gasLimitTx.state)}
+              onClick={async () => {
+                const limit = tank.maxFee > DEFAULT_MAX_GAS_FEE ? tank.maxFee : DEFAULT_MAX_GAS_FEE;
+                const ok = await gasLimitTx.run(() =>
+                  writeContractAsync({
+                    address: deployment.operator,
+                    abi: chogOperatorAbi,
+                    functionName: "updatePolicy",
+                    args: [collection, tokenId, { ...currentParams(chog), maxGasFee: limit }],
+                  }),
+                );
+                if (ok) {
+                  await api.nudge(chog.tokenId).catch(() => undefined);
+                  onDone();
+                }
+              }}
+            >
+              Allow up to {mon(tank.maxFee > DEFAULT_MAX_GAS_FEE ? tank.maxFee : DEFAULT_MAX_GAS_FEE)} MON per move
+            </ActionButton>
+            <TxStatus state={gasLimitTx.state} />
           </div>
         </div>
       )}
@@ -267,17 +303,12 @@ function AgentTab({ chog, deployment, onDone }: { chog: ChogView; deployment: De
             pending={busy(policyTx.state)}
             onClick={async () => {
               if (!preset) return;
-              const p = POLICY_PRESETS[preset];
               const ok = await policyTx.run(() =>
                 writeContractAsync({
                   address: deployment.operator,
                   abi: chogOperatorAbi,
                   functionName: "updatePolicy",
-                  args: [
-                    collection,
-                    tokenId,
-                    { expiry: 0n, actionMask: ALL_ACTIONS, maxActionsPerDay: p.maxActionsPerDay, maxPerAction: p.maxPerAction, dailyCap: p.dailyCap },
-                  ],
+                  args: [collection, tokenId, policyParams(preset, maxGasFee)],
                 }),
               );
               if (ok) onDone();
@@ -366,6 +397,18 @@ function useAmount(initial: string) {
   return { amount, setAmount: (v: string) => setAmount(v.replace(/[^\d.]/g, "")), wei };
 }
 
+/** The Chog's policy as it stands onchain, as ChogOperator.PolicyParams. */
+function currentParams(chog: ChogView) {
+  return {
+    expiry: BigInt(chog.policy.expiry),
+    actionMask: chog.policy.actionMask,
+    maxActionsPerDay: chog.policy.maxActionsPerDay,
+    maxPerAction: BigInt(chog.policy.maxPerAction),
+    dailyCap: BigInt(chog.policy.dailyCap),
+    maxGasFee: BigInt(chog.policy.maxGasFee),
+  };
+}
+
 function WalletTab({ chog, deployment, onDone }: { chog: ChogView; deployment: Deployment; onDone: () => void }) {
   const { address } = useAccount();
   const { writeContractAsync } = useWriteContract();
@@ -377,6 +420,7 @@ function WalletTab({ chog, deployment, onDone }: { chog: ChogView; deployment: D
   const chogBalance = BigInt(chog.balance);
   const topTooMuch = wallet.data !== undefined && top.wei > wallet.data;
   const outTooMuch = out.wei > chogBalance;
+  const tank = gasTank(chog);
 
   return (
     <div className="grid gap-6 sm:grid-cols-2">
@@ -434,6 +478,21 @@ function WalletTab({ chog, deployment, onDone }: { chog: ChogView; deployment: D
         </ActionButton>
         <TxStatus state={withdrawTx.state} />
       </div>
+
+      {tank.charges && (
+        <div className="space-y-3 border-t-2 border-night-3 pt-5 sm:col-span-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="font-display text-xl">Gas tank</p>
+            <p className="text-sm text-muted">
+              {mon(tank.balance)} MON · about {Number.isFinite(tank.moves) ? tank.moves : "∞"} quests at {mon(tank.questFee)} MON each
+            </p>
+          </div>
+          <p className="text-sm text-muted">
+            Each move pays the network fee from your Chog&apos;s own MON. When it runs dry, your Chog rests until you top it up.
+          </p>
+          <GasTopUp chog={chog} onDone={onDone} />
+        </div>
+      )}
     </div>
   );
 }
