@@ -71,12 +71,12 @@ export class Digests {
 
 /** Deterministic digest: counts plus the most notable lines. */
 export function templateDigest(rows: JournalRow[]): string {
-  const count = (kind: string) => rows.filter((r) => r.kind === kind).length;
   const quests = rows.filter((r) => r.kind === "quest" && !r.title.startsWith("Set out")).length;
   const battles = rows.filter((r) => r.kind === "battle" && /^(Beat|Lost|Held)/.test(r.title)).length;
   const notable = rows.filter((r) => r.kind === "title" || r.kind === "level" || r.title.includes("rivalry")).map((r) => r.title);
   const parts = [`While you were away I finished ${quests} quest${quests === 1 ? "" : "s"} and fought ${battles} battle${battles === 1 ? "" : "s"}.`];
   if (notable.length) parts.push(`${notable.slice(-3).join(". ")}.`);
-  if (count("policy")) parts.push("Your policy stepped in at least once.");
+  // Only real blocks: owner actions (new goals, pause, enrollment) are also "policy" rows.
+  if (rows.some((r) => r.kind === "policy" && r.title.startsWith("Stopped by policy"))) parts.push("Your policy stepped in at least once.");
   return parts.join(" ");
 }
