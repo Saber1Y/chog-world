@@ -15,6 +15,7 @@ import { ElementBadge, StatBars, dnaFor } from "@/components/Stats";
 import { FeedItem } from "@/components/Feed";
 import { AwakenWizard } from "@/components/AwakenWizard";
 import { OwnerPanel } from "@/components/OwnerPanel";
+import { AwayDigest } from "@/components/AwayDigest";
 import { ChogBattles } from "@/components/ChogBattles";
 
 export default function ChogPage() {
@@ -177,6 +178,8 @@ function ChogHome({ chog: c, deployment, isOwner, justAwoke }: { chog: ChogView;
             <p>It will make its first move within a minute or so. Watch the journal below.</p>
           </div>
         )}
+
+        {isOwner && !justAwoke && <AwayDigest tokenId={c.tokenId} name={name} />}
 
         <AgentStatus chog={c} injured={injured} buffed={buffed} goals={goals.map((g) => GOAL_LABELS[g])} isOwner={isOwner} />
 
