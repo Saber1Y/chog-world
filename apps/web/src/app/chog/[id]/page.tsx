@@ -18,6 +18,7 @@ import { OwnerPanel } from "@/components/OwnerPanel";
 import { AwayDigest } from "@/components/AwayDigest";
 import { CHEAPEST_FEE, gasTank, isFunded, mon, type GasTank } from "@/lib/gas";
 import { ChogBattles } from "@/components/ChogBattles";
+import { ShareChog } from "@/components/ShareChog";
 
 export default function ChogPage() {
   const { id } = useParams<{ id: string }>();
@@ -149,6 +150,7 @@ function ChogHome({ chog: c, deployment, isOwner, justAwoke }: { chog: ChogView;
                 </div>
               ))}
             </dl>
+            <ShareChog tokenId={c.tokenId} name={name} level={level} isOwner={isOwner} />
           </div>
         </div>
 
