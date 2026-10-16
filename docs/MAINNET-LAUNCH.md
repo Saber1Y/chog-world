@@ -11,13 +11,15 @@ Prices on 2026-10-15: MON about $0.023, $CHOG about $0.0016, gas about 102 gwei.
 | --- | --- | --- |
 | Contract deploy (simulated: 21.3M gas) | about 2.2 MON spent, 5 MON in the wallet for headroom | about $0.05 spent |
 | Keeper float | 3 MON | about $0.07, repaid by gas fees |
-| Treasury seed | 20,000 to 50,000 CHOG | about $32 to $80 |
+| Treasury seed | 5,000 CHOG (launch boost) | about $8 |
 | Hosting | same server | $0 extra |
 
 ## 0. Decisions
 
 - Admin wallet: a fresh wallet (ideally a hardware wallet) that has never been pasted anywhere. It deploys and becomes the guardian.
-- Treasury seed and daily payout cap (`DAILY_EMISSION_CAP`, default 2,000 CHOG a day).
+- Treasury seed: 5,000 CHOG, with a daily payout cap of 1,000 CHOG (`DAILY_EMISSION_CAP`).
+  Player fees, shop purchases and arena losses keep refilling it; quest rewards are tuned so it mostly recycles them, and the seed covers the rest for about two weeks of a 25-Chog pilot.
+  When it runs low, either top it up or retune quests with `script/TuneEconomy.s.sol`. An empty Treasury never breaks anything: it pays only what it holds.
 - Pilot size (`PILOT_MAX_CHOGS`, suggested 25).
 - Web: a separate Vercel project for mainnet, or switch the main site to mainnet.
 
@@ -44,7 +46,7 @@ Then deploy (`--ledger` for a hardware wallet, or `--interactive` to type the ke
 
 ```bash
 cd chog-world/contracts
-KEEPER=<keeper address> DAILY_EMISSION_CAP=2000000000000000000000 GAS_FEE_QUEST=90000000000000000 GAS_FEE_ATTACK=130000000000000000 GAS_FEE_BUY=50000000000000000 GAS_FEE_USE=40000000000000000 forge script script/Deploy.s.sol --rpc-url https://rpc.monad.xyz --broadcast --slow --ledger
+KEEPER=<keeper address> DAILY_EMISSION_CAP=1000000000000000000000 GAS_FEE_QUEST=90000000000000000 GAS_FEE_ATTACK=130000000000000000 GAS_FEE_BUY=50000000000000000 GAS_FEE_USE=40000000000000000 forge script script/Deploy.s.sol --rpc-url https://rpc.monad.xyz --broadcast --slow --ledger
 ```
 
 The script refuses dev tokens on mainnet, checks $CHOG's decimals, uses the real Chog collection, and writes `contracts/deployments/143.json`.
