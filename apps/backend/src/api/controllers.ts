@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 import type { Response } from "express";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { erc721Abi, formatEther, isAddress, parseAbi, parseEther, zeroHash, type Address } from "viem";
-import { EXTERNAL, erc6551RegistryAbi, normalizeProfileText, profileMessage, PROFILE_MAX_AGE_MS, NICKNAME_MAX, PERSONALITY_MAX } from "@chog-world/shared";
+import { EXTERNAL, erc6551RegistryAbi, grudgeMessage, normalizeProfileText, profileMessage, PROFILE_MAX_AGE_MS, NICKNAME_MAX, PERSONALITY_MAX } from "@chog-world/shared";
 
 /** Mirrors Arena.RIVALRY_THRESHOLD. */
 const ARENA_RIVALRY_THRESHOLD = 3;
@@ -164,6 +164,12 @@ const ProfileBody = z.object({
   signature: z.string().regex(/^0x[0-9a-fA-F]+$/),
 });
 
+const GrudgeBody = z.object({
+  target: z.string().regex(/^\d{1,6}$/).nullable(),
+  issuedAt: z.string().datetime(),
+  signature: z.string().regex(/^0x[0-9a-fA-F]+$/),
+});
+
 @Controller("chogs")
 export class ChogsController {
   constructor(@Inject(APP_CONTEXT) private readonly ctx: AppContext) {}
@@ -183,6 +189,7 @@ export class ChogsController {
             nextTickAt: row.nextTickAt,
             lastTickAt: row.lastTickAt,
             lastTickNote: row.lastTickNote,
+            grudge: row.grudgeTokenId,
             // False only during a capped pilot that this Chog did not get into.
             inPilot: !pilot || pilot.has(row.key),
           }
@@ -323,6 +330,56 @@ export class ChogsController {
       })
       .onConflictDoUpdate({ target: chogs.key, set: { nickname, personality } });
     return { nickname, personality };
+  }
+
+  /**
+   * Owner-signed grudge: the Chog its agent should prefer to challenge. Free (a signature, nothing
+   * onchain); the agent still respects the odds and the owner's onchain limits.
+   */
+  @Put(":tokenId/grudge")
+  async setGrudge(@Param("tokenId") raw: string, @Body() body: unknown) {
+    const tokenId = tokenIdParam(raw);
+    const parsed = GrudgeBody.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues.map((i) => i.message).join("; "));
+    const g = parsed.data;
+    if (Math.abs(Date.now() - new Date(g.issuedAt).getTime()) > PROFILE_MAX_AGE_MS) throw new BadRequestException("signature expired; sign again");
+    const target = g.target === null ? null : BigInt(g.target);
+
+    const snapshot = await this.snapshotOr404(tokenId);
+    const message = grudgeMessage({ chainId: this.ctx.chain.chain.id, tokenId, target, issuedAt: g.issuedAt });
+    const valid = await this.ctx.chain.publicClient.verifyMessage({ address: snapshot.owner, message, signature: g.signature as `0x${string}` });
+    if (!valid) throw new ForbiddenException("signature is not from this Chog's owner");
+    if (!snapshot.policy.active) throw new BadRequestException("wake its agent first: only an active Chog can hold a grudge");
+
+    if (target !== null) {
+      if (target === tokenId) throw new BadRequestException("a Chog cannot hold a grudge against itself");
+      let targetOwner: Address;
+      try {
+        targetOwner = await this.ctx.chain.publicClient.readContract({ address: this.ctx.chain.deployment.collection, abi: erc721Abi, functionName: "ownerOf", args: [target] });
+      } catch {
+        throw new NotFoundException(`Chog #${target} does not exist`);
+      }
+      // The Arena refuses fights between Chogs of the same owner.
+      if (targetOwner.toLowerCase() === snapshot.owner.toLowerCase()) throw new BadRequestException("both Chogs are yours, and the Arena never matches a Chog against its own owner");
+    }
+
+    const db = this.ctx.dbHandle.db;
+    const [row] = await db.select({ grudge: chogs.grudgeTokenId }).from(chogs).where(eq(chogs.key, snapshot.key));
+    if (!row) throw new BadRequestException("wake its agent first: only an active Chog can hold a grudge");
+    const next = target === null ? null : target.toString();
+    if (row.grudge !== next) {
+      await db.update(chogs).set({ grudgeTokenId: next }).where(eq(chogs.key, snapshot.key));
+      await this.ctx.journal.write({
+        chogKey: snapshot.key,
+        kind: "policy",
+        title: next ? `Owner declared a grudge against Chog #${next}` : "Owner let its grudge go",
+        data: { grudge: next },
+        sourceKey: `grudge:${snapshot.key}:${g.issuedAt}`,
+      });
+      // A fresh grudge is worth acting on now rather than at the next scheduled move.
+      if (next) await db.update(chogs).set({ nextTickAt: new Date() }).where(eq(chogs.key, snapshot.key));
+    }
+    return { grudge: next };
   }
 
   /**
