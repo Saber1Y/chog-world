@@ -103,6 +103,13 @@ export const envSchema = z.object({
 
   /** Where the shared Chog art is cached after the first IPFS fetch. */
   ART_CACHE_PATH: z.string().default("./.data/chog-base.png"),
+  /**
+   * "shared": every Chog starts from the collection's one picture, recoloured by its DNA.
+   * "token": each Chog is drawn over its own NFT image (Chog Genesis, where every token differs).
+   */
+  ART_SOURCE: z.enum(["shared", "token"]).default("shared"),
+  /** Where per-token images are cached when ART_SOURCE=token. */
+  ART_TOKEN_CACHE_DIR: z.string().default("./.data/token-art"),
   /** Public base URL of this API, used for image links in metadata. */
   PUBLIC_URL: z.string().url().default("http://localhost:9100"),
 });

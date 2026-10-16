@@ -16,6 +16,7 @@ import { GasFeeCollector } from "../agent/gas-fees.js";
 import { HeuristicDecider, LlmDecider, type Decider } from "../agent/decider.js";
 import { AnthropicModel, ModelChain, OpenAICompatibleModel, type TextModel } from "../llm/models.js";
 import { Renderer } from "../render/render.js";
+import { TokenArt } from "../render/token-art.js";
 
 /** Composition root: every service, built once from the environment. Nest controllers receive this. */
 export interface AppContext {
@@ -113,7 +114,8 @@ export async function buildContext(env: Env, log: (scope: string, msg: string) =
     },
   );
 
-  const renderer = new Renderer(env.ART_CACHE_PATH);
+  const tokenArt = env.ART_SOURCE === "token" ? new TokenArt(chain.publicClient, chain.deployment.collection, env.ART_TOKEN_CACHE_DIR) : null;
+  const renderer = new Renderer(env.ART_CACHE_PATH, 500, tokenArt ? (id) => tokenArt.base(id) : undefined);
 
   return { env, dbHandle, chain, reader, journal, digests, indexer, resolver, holders, agent, gasFees, renderer, llmEnabled, llmName };
 }

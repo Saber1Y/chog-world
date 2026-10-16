@@ -17,9 +17,14 @@ export class Renderer {
   private basePromise: Promise<Buffer> | undefined;
   private readonly cache = new Map<string, Buffer>();
 
+  /**
+   * @param tokenBase When set, each Chog is drawn over its own NFT picture (collections where every
+   *        token looks different) instead of the shared, hue-shifted base art.
+   */
   constructor(
     private readonly cachePath: string,
     private readonly maxEntries = 500,
+    private readonly tokenBase?: (tokenId: string) => Promise<Buffer>,
   ) {}
 
   base(): Promise<Buffer> {
@@ -60,8 +65,11 @@ export class Renderer {
     const key = `${JSON.stringify(state)}@${size}`;
     const hit = this.cache.get(key);
     if (hit) return hit;
-    const composed = await sharp(await this.recolored(state.hue))
-      .composite([{ input: Buffer.from(renderOverlay(state)) }])
+    const base = this.tokenBase ? await this.tokenBase(state.tokenId) : await this.recolored(state.hue);
+    // Scar marks are placed on the shared art's face; another picture puts the face elsewhere.
+    const overlay = renderOverlay(this.tokenBase ? { ...state, scars: 0 } : state);
+    const composed = await sharp(base)
+      .composite([{ input: Buffer.from(overlay) }])
       .png()
       .toBuffer();
     const out = size === CANVAS ? composed : await sharp(composed).resize(size, size).png().toBuffer();
