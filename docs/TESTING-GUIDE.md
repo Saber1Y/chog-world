@@ -40,7 +40,7 @@ What to check:
 What it shows:
 
 - Every Chog your wallet owns, with its *DNA stats*: the hidden stats it was born with.
-- All Chogs share one picture, so these stats are what makes each one different before it does anything.
+- Its picture shows how it looks; these stats are how it fights, and they differ for every Chog before it does anything.
 - A "Chog #" box to open any Chog by number.
 
 What to check:

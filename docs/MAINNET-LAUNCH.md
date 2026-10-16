@@ -60,7 +60,7 @@ cd ~/codes/chog-world/contracts
 KEEPER=0xCfa08a3cC2c71F463C80BbB524C7E39Dc8F9b7Ce DAILY_EMISSION_CAP=150000000000000000000 GAS_FEE_QUEST=90000000000000000 GAS_FEE_ATTACK=130000000000000000 GAS_FEE_BUY=50000000000000000 GAS_FEE_USE=40000000000000000 forge script script/Deploy.s.sol --rpc-url https://rpc.monad.xyz --broadcast --slow --account chogworld-admin
 ```
 
-The script refuses dev tokens on mainnet, checks $CHOG's decimals, uses the real Chog collection (`0x9994604c3d3c43b82a79b41281e202613313afba`) and $CHOG (`0x350035555E10d9AfAF1566AaebfCeD5BA6C27777`), and writes `contracts/deployments/143.json`.
+The script refuses dev tokens on mainnet, checks $CHOG's decimals, uses Chog Genesis (`0xc96d31F8626c6D03Fae5dCD3d61e3FB9F4a73763`), the verified Chog NFT and $CHOG (`0x350035555E10d9AfAF1566AaebfCeD5BA6C27777`), and writes `contracts/deployments/143.json`.
 Tell Claude when it is done; the remaining wiring is automated.
 
 ## Step 3 (Claude): wire the backend and the mainnet site
@@ -84,5 +84,5 @@ Buy about 450 CHOG at https://nad.fun/tokens/0x350035555E10d9AfAF1566AaebfCeD5BA
 
 - The contracts are tested (94 tests plus the mainnet fork test) but not audited.
 - Players can lose the $CHOG they give their Chog in quests and fights, within the limits they set.
-- Only owners of the 2,662 real Chogs can play on mainnet.
+- Only owners of the 1,969 Chog Genesis NFTs can play on mainnet.
 - The Treasury's daily payout cap bounds how fast rewards can leave it.

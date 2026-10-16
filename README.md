@@ -6,13 +6,13 @@
 ![Loop](https://img.shields.io/badge/loop-decide%20%E2%86%92%20act%20%E2%86%92%20resolve%20%E2%86%92%20evolve-blueviolet)
 ![Stack](https://img.shields.io/badge/stack-Solidity%20+%20NestJS%20+%20Next.js%20+%20ERC--6551-orange)
 
-**Every Chog was born identical. What it does makes it different.**
+**Every Chog has a look. CHOG World gives it a life.**
 
-All 2,662 Chog NFTs share one picture and no traits.
-CHOG World gives each one its own wallet, a hidden DNA, and an autonomous agent that quests, fights and shops on its own, inside spending limits the owner sets onchain.
+A Chog Genesis NFT is a picture.
+CHOG World gives each one its own wallet, hidden combat DNA, and an autonomous agent that quests, fights and shops on its own, inside spending limits the owner sets onchain.
 The Chog levels up, earns titles and scars, and its picture changes with it, and everything it earns lives in a wallet that moves with the NFT when it is sold.
 
-Live frontend: [chog-world-zeta.vercel.app](https://chog-world-zeta.vercel.app) · Live backend: [api.chogworld.162-62-231-147.sslip.io](https://api.chogworld.162-62-231-147.sslip.io/health) · Contracts on Monad testnet (chain 10143).
+Mainnet pilot: [chog-world-mainnet.vercel.app](https://chog-world-mainnet.vercel.app) (real Chog Genesis and $CHOG) · Free testnet: [chog-world-zeta.vercel.app](https://chog-world-zeta.vercel.app) · APIs: [mainnet](https://api-mainnet.chogworld.162-62-231-147.sslip.io/health), [testnet](https://api.chogworld.162-62-231-147.sslip.io/health).
 
 [See it in one command](#see-it-in-one-command) · [The one rule](#the-one-rule-the-owner-sets-the-limits-the-chain-enforces-them) · [Architecture](#architecture) · [Safety](#safety-enforced-in-code) · [Honesty table](#whats-real-vs-pending---the-honesty-table) · [Demo flow](#the-one-flow-demo)
 
@@ -26,7 +26,7 @@ CHOG World is a game, not a financial product: the agent never holds the owner's
 - [The one rule: the owner sets the limits, the chain enforces them](#the-one-rule-the-owner-sets-the-limits-the-chain-enforces-them)
 - [What CHOG World does](#what-chog-world-does)
   - [A wallet per Chog](#a-wallet-per-chog)
-  - [Born identical, different inside](#born-identical-different-inside)
+  - [A look, then a life](#a-look-then-a-life)
   - [An agent that lives on its own](#an-agent-that-lives-on-its-own)
   - [Quests](#quests)
   - [The Arena](#the-arena)
@@ -109,9 +109,9 @@ Owner wallet --owns--> Chog NFT --ERC-6551--> Chog account (CHOG, gear, trophies
 
 The first step of onboarding is free: the backend sponsors `createAccount`, which gives it no control over the account.
 
-### Born identical, different inside
+### A look, then a life
 
-Every Chog has the same metadata, so stats come from a deterministic DNA hash instead.
+Chog Genesis traits describe how a Chog looks; how it fights comes from a deterministic DNA hash, so every Chog starts with its own stats before it has done anything.
 
 ```text
 dna = keccak256(DNA_SALT, collection, tokenId)  ->  hp, atk, def, spd, crit, element, hue
@@ -161,7 +161,7 @@ Pair cooldowns, a defender hourly limit and a different-owner rule stop farming.
 
 ### Evolving art
 
-`GET /chogs/:id/image.png` renders the Chog from its live state: coins recoloured to its DNA hue, level badge, element, frame and title banner.
+`GET /chogs/:id/image.png` renders the Chog from its live state: on mainnet its own Chog Genesis picture, on testnet the shared art recoloured to its DNA hue, with its level badge, element, frame, gear and title banner on top.
 The image changes only when the Chog does, so it is cached by state.
 
 ### Journal, titles and leaderboards
@@ -330,7 +330,7 @@ Testnet deployment (chain 10143, from block 71110456):
 | DevCHOG (test token) | `0xde609E52D9164C227D4F174D6260289bc3E62eC2` |
 
 ERC-6551 uses the canonical registry `0x000000006551c19487814612e58FE06813775758` and Tokenbound V3.
-Mainnet targets the real Chog collection `0x9994604c3d3c43b82a79b41281e202613313afba` and $CHOG `0x350035555E10d9AfAF1566AaebfCeD5BA6C27777`.
+Mainnet pilot (chain 143, from block 113942620) uses Chog Genesis `0xc96d31F8626c6D03Fae5dCD3d61e3FB9F4a73763` and $CHOG `0x350035555E10d9AfAF1566AaebfCeD5BA6C27777`, with ChogOperator `0xaDaA7f21Fb843140E20115D84F51F6f85D5342D1`, ChogState `0x33B273B62d3e364dc1Ec33aC2800AAeAb1067618` and Treasury `0x1814943bc12E643D1477b47F0B3cD495Fe07fce6`; all addresses are in `contracts/deployments/143.json`.
 
 Monad charges the gas limit rather than gas used, so the keeper estimates every transaction and sends it with a 10% margin instead of a fixed high limit.
 Policy caps limit what a Chog spends in CHOG; the keeper pays the network gas and each Chog repays it with a small per-move fee in MON from its own account.
@@ -383,7 +383,8 @@ Claude only receives labels and numbers for legal moves, chooses one by id throu
 | Per-move gas fees paid from each Chog's account | Real - live on testnet, proven on the real Tokenbound account in the fork test |
 | Language-model decider and digests (Gemini, OpenRouter, Claude) | Built and tested; enabled on the hosted testnet once API keys are added |
 | "While you were away" recap card | Real - template text until a model key is set |
-| Mainnet deployment with real Chogs and $CHOG | Not yet established |
+| Mainnet pilot with Chog Genesis and $CHOG | Real - deployed, Treasury seeded with 390 CHOG, 25-Chog pilot open; fork test covers a real Genesis Chog |
+| A real holder's Chog playing on mainnet | Not yet established - awaiting the first holder |
 | Season rotation and season leaderboard | Not yet established - contract supports seasons |
 | Trading CHOG for other tokens | Not yet established |
 
@@ -538,7 +539,8 @@ ERC-6551 accounts are Tokenbound's V3 implementation.
 
 ### Roadmap
 
-- Mainnet deployment with real Chogs and $CHOG, with a funded and capped Treasury.
+- Grow the mainnet pilot past 25 Chogs once the economy holds up.
+- Turn Chog Genesis traits into gameplay (gear-like bonuses from what a Chog wears).
 - Language-model thoughts on the hosted agent, once API keys are added.
 - Seasons with a season leaderboard and end-of-season trophies.
 - Shareable Chog cards for social feeds.
