@@ -9,7 +9,7 @@ const supplyAbi = parseAbi(["function totalSupply() view returns (uint256)", "fu
 
 /**
  * Who owns which Chog. The real collection is ERC721A without enumeration, so ownership comes from
- * multicalling ownerOf over every id (2,662 calls in chunks); cheap enough to refresh every few minutes.
+ * multicalling ownerOf over every id (a couple of thousand calls in chunks); cheap enough to refresh every few minutes.
  */
 export class Holders {
   private running = false;

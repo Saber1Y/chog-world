@@ -189,7 +189,7 @@ export class Indexer {
             createdAt: e.blockTime,
           })
           .onConflictDoNothing({ target: chogs.key });
-        await j(key, { kind: "life", title: "Awakened in CHOG World", body: "Born identical. Ready to become someone." });
+        await j(key, { kind: "life", title: "Awakened in CHOG World", body: "A fresh start. Ready to become someone." });
         return;
       }
       case "state.GoalsSet":

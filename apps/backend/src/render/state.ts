@@ -28,7 +28,7 @@ export function metadataOf(s: ChogSnapshot, art: ArtState, imageUrl: string) {
     .map(([, t]) => t.name);
   return {
     name: art.nickname ? `${art.nickname} (Chog #${art.tokenId})` : `Chog #${art.tokenId}`,
-    description: "Born identical. This is who it became in CHOG World.",
+    description: "Every Chog has a look. This is the life it lived in CHOG World.",
     image: imageUrl,
     attributes: [
       { trait_type: "Element", value: ELEMENTS[art.element] ?? "Unknown" },

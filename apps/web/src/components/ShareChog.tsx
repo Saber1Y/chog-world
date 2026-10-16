@@ -11,8 +11,8 @@ export function ShareChog({ tokenId, name, level, isOwner }: { tokenId: string; 
   const [copied, setCopied] = useState(false);
   const url = `${SITE_URL}/chog/${tokenId}`;
   const text = isOwner
-    ? `My Chog ${name} is level ${level} and living on its own in CHOG World. Every Chog was born identical; this one became someone.`
-    : `${name} is level ${level} in CHOG World. Every Chog was born identical; this one became someone.`;
+    ? `My Chog ${name} is level ${level} and living on its own in CHOG World. Every Chog has a look; this one has a life.`
+    : `${name} is level ${level} in CHOG World. Every Chog has a look; this one has a life.`;
   const xUrl = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
 
   async function copy() {

@@ -113,7 +113,7 @@ export function renderCardSvg(c: CardState): string {
 
   <text x="${x}" y="488" font-family="${BODY}" font-size="22" fill="${MUTED}">Earned <tspan fill="${PAPER}" font-weight="700">${escapeXml(c.earned)} CHOG</tspan> on its own</text>
 
-  <text x="${x}" y="548" font-family="${BODY}" font-size="19" fill="${MUTED}">Every Chog was born identical.</text>
-  <text x="${x}" y="576" font-family="${BODY}" font-weight="700" font-size="19" fill="${PAPER}">This one became someone · ${escapeXml(c.site)}</text>
+  <text x="${x}" y="548" font-family="${BODY}" font-size="19" fill="${MUTED}">Every Chog has a look.</text>
+  <text x="${x}" y="576" font-family="${BODY}" font-weight="700" font-size="19" fill="${PAPER}">This one has a life · ${escapeXml(c.site)}</text>
 </svg>`;
 }

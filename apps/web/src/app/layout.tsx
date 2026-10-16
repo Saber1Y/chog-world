@@ -13,15 +13,15 @@ const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrai
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: "CHOG World", template: "%s · CHOG World" },
-  description: "Every Chog was born identical. Awaken yours and watch it become someone.",
+  description: "Every Chog has a look. Awaken yours and give it a life of its own.",
   applicationName: "CHOG World",
   openGraph: {
     title: "CHOG World",
-    description: "Every Chog was born identical. Awaken yours and watch it become someone.",
+    description: "Every Chog has a look. Awaken yours and give it a life of its own.",
     siteName: "CHOG World",
     type: "website",
   },
-  twitter: { card: "summary_large_image", title: "CHOG World", description: "Every Chog was born identical. Awaken yours and watch it become someone." },
+  twitter: { card: "summary_large_image", title: "CHOG World", description: "Every Chog has a look. Awaken yours and give it a life of its own." },
 };
 
 export const viewport = { themeColor: "#120c22" };

@@ -26,11 +26,11 @@ export default function Home() {
             Chogathon 2026 · on Monad
           </p>
           <h1 className="font-display text-5xl leading-[0.95] sm:text-7xl">
-            Every Chog was born <span className="text-gold">identical.</span>
+            Every Chog has a look. Now give it a <span className="text-gold">life.</span>
           </h1>
           <p className="mt-6 max-w-xl text-lg text-muted">
-            All 2,662 Chogs share one picture. Awaken yours, hand it goals and a budget, and it quests, fights and earns on its own until it is
-            unmistakably <em className="not-italic text-paper">someone</em>.
+            Awaken your Chog, hand it goals and a budget, and it quests, fights and earns on its own. Its levels, titles, scars and rivals become
+            part of it, and everything it earns moves with the NFT until it is unmistakably <em className="not-italic text-paper">someone</em>.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/chogs" className="sticker press bg-gold px-6 py-3 font-display text-xl text-ink">
