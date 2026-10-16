@@ -1,89 +1,88 @@
-# Mainnet pilot launch checklist
+# Mainnet pilot launch plan
 
-This is the step-by-step for launching CHOG World on Monad mainnet (chain 143) as a capped pilot with the real Chog NFT and real $CHOG.
-The testnet world keeps running unchanged.
+CHOG World on Monad mainnet (chain 143) as a capped pilot, with the real Chog NFT and real $CHOG.
+The testnet world at https://chog-world-zeta.vercel.app keeps running so anyone can play free.
 
-## Costs
+## Budget: 41 MON
 
-Prices on 2026-10-15: MON about $0.023, $CHOG about $0.0016, gas about 102 gwei.
+Prices on 2026-10-16: MON about $0.023, 1 CHOG about 0.07 MON ($0.0016), gas about 102 gwei.
 
-| Item | Amount | Dollars |
+| Use | MON | Notes |
 | --- | --- | --- |
-| Contract deploy (simulated: 21.3M gas) | about 2.2 MON spent, 5 MON in the wallet for headroom | about $0.05 spent |
-| Keeper float | 3 MON | about $0.07, repaid by gas fees |
-| Treasury seed | 5,000 CHOG (launch boost) | about $8 |
-| Hosting | same server | $0 extra |
+| Deploy the contracts | about 2.2 spent | The admin wallet must hold 5 MON during the deploy (Forge checks for headroom); the rest stays in it. |
+| Keeper float | 3 | Repaid by the per-move gas fee every Chog pays. |
+| Spare | about 3 | Gas top-ups and the admin's own transactions. |
+| Treasury seed | about 33, swapped for about 450 CHOG | Bought on nad.fun. |
 
-## 0. Decisions
+Settings for the pilot:
 
-- Admin wallet: a fresh wallet (ideally a hardware wallet) that has never been pasted anywhere. It deploys and becomes the guardian.
-- Treasury seed: 5,000 CHOG, with a daily payout cap of 1,000 CHOG (`DAILY_EMISSION_CAP`).
-  Player fees, shop purchases and arena losses keep refilling it; quest rewards are tuned so it mostly recycles them, and the seed covers the rest for about two weeks of a 25-Chog pilot.
-  When it runs low, either top it up or retune quests with `script/TuneEconomy.s.sol`. An empty Treasury never breaks anything: it pays only what it holds.
-- Pilot size (`PILOT_MAX_CHOGS`, suggested 25).
-- Web: a separate Vercel project for mainnet, or switch the main site to mainnet.
+| Setting | Value |
+| --- | --- |
+| Pilot size (`PILOT_MAX_CHOGS`) | 25 Chogs |
+| Moves per Chog per day | 6 |
+| Treasury daily payout cap (`DAILY_EMISSION_CAP`) | 150 CHOG |
+| Gas fee per move | 0.09 MON quest, 0.13 battle, 0.05 buy, 0.04 use |
 
-## 1. Keeper wallet (on the server, so the key never leaves it)
+Quest rewards are tuned so the Treasury mostly recycles player fees (90% of every fee goes into it, 10% is burned).
+An empty Treasury never breaks the game: it pays only what it holds.
+
+## What is already done
+
+- Mainnet keeper wallet, created on the server (the key never left it): `0xCfa08a3cC2c71F463C80BbB524C7E39Dc8F9b7Ce`.
+- Mainnet database `chogworld_mainnet` and `~/chog-world/mainnet.env` on the server (port 9200, pilot 25, the same model keys as testnet).
+- Vercel project `chog-world-mainnet` (root `apps/web`).
+- The mainnet fork test and a dry-run deploy against Monad mainnet pass.
+
+## Step 1 (you): fund the keeper
+
+Send 3 MON to `0xCfa08a3cC2c71F463C80BbB524C7E39Dc8F9b7Ce`.
+
+## Step 2 (you): create the admin wallet and deploy
+
+The admin wallet deploys the contracts and becomes the guardian (emergency pause, gas fees, Treasury settings).
+Use a brand-new wallet that has never been pasted anywhere, and send it 8 MON.
+
+Store its key in an encrypted Foundry keystore on your Mac (you type the key and a password; nothing is printed or saved in plain text):
 
 ```bash
-ssh ubuntu@162.62.231.147
-cast wallet new
+cast wallet import chogworld-admin --interactive
 ```
 
-Put the private key in `~/chog-world/mainnet.env` as `KEEPER_PRIVATE_KEY=` (`chmod 600`), and note the address.
-Send it 3 MON.
-
-## 2. Deploy the contracts (on your machine, with the admin wallet)
-
-Check first that the mainnet fork test passes:
+Check the fork test, then deploy:
 
 ```bash
-cd chog-world
+cd ~/codes/chog-world
 MONAD_RPC_URL=https://rpc.monad.xyz pnpm contracts:fork
 ```
 
-Then deploy (`--ledger` for a hardware wallet, or `--interactive` to type the key without saving it):
-
 ```bash
-cd chog-world/contracts
-KEEPER=<keeper address> DAILY_EMISSION_CAP=1000000000000000000000 GAS_FEE_QUEST=90000000000000000 GAS_FEE_ATTACK=130000000000000000 GAS_FEE_BUY=50000000000000000 GAS_FEE_USE=40000000000000000 forge script script/Deploy.s.sol --rpc-url https://rpc.monad.xyz --broadcast --slow --ledger
+cd ~/codes/chog-world/contracts
+KEEPER=0xCfa08a3cC2c71F463C80BbB524C7E39Dc8F9b7Ce DAILY_EMISSION_CAP=150000000000000000000 GAS_FEE_QUEST=90000000000000000 GAS_FEE_ATTACK=130000000000000000 GAS_FEE_BUY=50000000000000000 GAS_FEE_USE=40000000000000000 forge script script/Deploy.s.sol --rpc-url https://rpc.monad.xyz --broadcast --slow --account chogworld-admin
 ```
 
-The script refuses dev tokens on mainnet, checks $CHOG's decimals, uses the real Chog collection, and writes `contracts/deployments/143.json`.
+The script refuses dev tokens on mainnet, checks $CHOG's decimals, uses the real Chog collection (`0x9994604c3d3c43b82a79b41281e202613313afba`) and $CHOG (`0x350035555E10d9AfAF1566AaebfCeD5BA6C27777`), and writes `contracts/deployments/143.json`.
+Tell Claude when it is done; the remaining wiring is automated.
 
-```bash
-cd chog-world
-pnpm --filter @chog-world/shared gen:deployments
-git add contracts/deployments/143.json packages/shared/src/deployments.generated.ts
-git commit -m "deploy(mainnet): CHOG World pilot"
-```
+## Step 3 (Claude): wire the backend and the mainnet site
 
-## 3. Fund the Treasury
+- Generate the shared deployment registry from `143.json`, commit and push.
+- Start the mainnet backend under pm2 as `chogworld-mainnet` with `mainnet.env`, and add the Caddy site `api-mainnet.chogworld.162-62-231-147.sslip.io`.
+- Deploy `chog-world-mainnet` with `NEXT_PUBLIC_CHAIN_ID=143`, the mainnet API, and `NEXT_PUBLIC_OTHER_NETWORK_URL` pointing at the testnet site (and the testnet site pointing back).
 
-Buy $CHOG on nad.fun (`https://nad.fun/tokens/0x350035555E10d9AfAF1566AaebfCeD5BA6C27777`) and send the seed amount to the `treasury` address in `143.json`.
+## Step 4 (you): seed the Treasury
 
-## 4. Mainnet backend (a second process next to testnet)
+Buy about 450 CHOG at https://nad.fun/tokens/0x350035555E10d9AfAF1566AaebfCeD5BA6C27777 and send it to the `treasury` address in `143.json`.
 
-On the server:
-- Create a `chogworld_mainnet` Postgres database and role, as for testnet.
-- Complete `~/chog-world/mainnet.env` with `CHAIN_ID=143`, `RPC_URL=https://rpc.monad.xyz`, `HOST=127.0.0.1`, `PORT=9200`, `DATABASE_URL`, `PILOT_MAX_CHOGS=25`, `MOVES_PER_DAY=6`, `SITE_URL`, `PUBLIC_URL`, `CORS_ORIGIN`, the same model keys as testnet, and `ART_CACHE_PATH`.
-- Start it: `pm2 start dist/main.js --name chogworld-mainnet --node-args="--env-file=/home/ubuntu/chog-world/mainnet.env" --max-memory-restart 400M --time` from `~/chog-world/app`, then `pm2 save`.
-- Add a Caddy site `api-mainnet.chogworld.162-62-231-147.sslip.io` proxying `127.0.0.1:9200`, validate and reload.
+## Step 5 (together): verify with a real Chog, then open the pilot
 
-## 5. Mainnet web
-
-Deploy `apps/web` with `NEXT_PUBLIC_CHAIN_ID=143`, `NEXT_PUBLIC_API_URL` pointing at the mainnet API, and the WalletConnect id.
-On mainnet the wizard hides the faucet and links to nad.fun instead, and shows when the pilot is full.
-
-## 6. Verify before announcing
-
-- `/health` on the mainnet API shows `chainId: 143`, a small lag, and the keeper balance.
-- Awaken one real Chog end to end: wallet, permission, name and goals, CHOG and MON, first move, settlement, journal.
-- The keeper's `gasFeesOwed` grows after moves, and the gas fee collector withdraws it.
-- Pause one Chog and confirm it stops; transfer one and confirm its agent stands down.
+- `/health` on the mainnet API shows `chainId: 143`, a small lag and the keeper balance.
+- Awaken a real Chog end to end: wallet, permission, name and goals, about 100 CHOG and 1 MON, first move, settlement, journal.
+- The keeper's `gasFeesOwed` grows after moves and the collector withdraws it.
+- Pause one Chog and confirm it stops.
 
 ## Risks to state plainly
 
 - The contracts are tested (94 tests plus the mainnet fork test) but not audited.
 - Players can lose the $CHOG they give their Chog in quests and fights, within the limits they set.
+- Only owners of the 2,662 real Chogs can play on mainnet.
 - The Treasury's daily payout cap bounds how fast rewards can leave it.
