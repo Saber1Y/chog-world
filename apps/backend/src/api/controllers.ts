@@ -309,9 +309,19 @@ export class ChogsController {
     const message = profileMessage({ chainId: this.ctx.chain.chain.id, tokenId, nickname, personality, issuedAt: p.issuedAt });
     const valid = await this.ctx.chain.publicClient.verifyMessage({ address: snapshot.owner, message, signature: p.signature as `0x${string}` });
     if (!valid) throw new ForbiddenException("signature is not from this Chog's owner");
-    if (!snapshot.character.awakened) throw new BadRequestException("awaken this Chog first");
-
-    await this.ctx.dbHandle.db.update(chogs).set({ nickname, personality }).where(eq(chogs.key, snapshot.key));
+    // Owners may name a Chog before it is awake (the wizard asks for the name in the same step that
+    // awakens it), and before the indexer has seen it: create its row if needed.
+    await this.ctx.dbHandle.db
+      .insert(chogs)
+      .values({
+        key: snapshot.key,
+        collection: snapshot.collection.toLowerCase(),
+        tokenId: snapshot.tokenId.toString(),
+        account: snapshot.account.toLowerCase(),
+        nickname,
+        personality,
+      })
+      .onConflictDoUpdate({ target: chogs.key, set: { nickname, personality } });
     return { nickname, personality };
   }
 

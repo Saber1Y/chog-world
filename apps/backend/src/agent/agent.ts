@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, lte, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lte, ne, or } from "drizzle-orm";
 import { CHOG, type Deployment } from "@chog-world/shared";
 import type { Hex } from "viem";
 import type { Database } from "../database/db.js";
@@ -173,7 +173,13 @@ export class Agent {
   async pilotKeys(): Promise<Set<string> | null> {
     const max = this.cfg.pilotMax ?? 0;
     if (max <= 0) return null;
-    const rows = await this.db.select({ key: chogs.key }).from(chogs).orderBy(asc(chogs.createdAt), asc(chogs.key)).limit(max);
+    // Only Chogs that have been handed to the agent count: a row made by naming a Chog takes no place.
+    const rows = await this.db
+      .select({ key: chogs.key })
+      .from(chogs)
+      .where(or(eq(chogs.enrolled, true), isNotNull(chogs.lastTickAt)))
+      .orderBy(asc(chogs.createdAt), asc(chogs.key))
+      .limit(max);
     return new Set(rows.map((r) => r.key));
   }
 
