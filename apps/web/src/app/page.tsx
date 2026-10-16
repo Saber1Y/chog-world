@@ -9,7 +9,7 @@ import { FeedItem } from "@/components/Feed";
 
 const STEPS = [
   { n: "1", title: "Awaken it", body: "Give your Chog its own wallet, a few goals and a daily budget. Three signatures." },
-  { n: "2", title: "It lives", body: "Every few minutes it decides what to do: quest, fight, shop or rest. All onchain, all inside your limits." },
+  { n: "2", title: "It lives", body: "A few times a day it decides what to do: quest, fight, shop or rest. All onchain, all inside your limits." },
   { n: "3", title: "It becomes someone", body: "Levels, scars, gear, titles and rivals. Sell it and everything it earned goes with it." },
 ];
 
