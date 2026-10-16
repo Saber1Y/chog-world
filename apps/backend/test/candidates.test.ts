@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CHOG, ActionKind } from "@chog-world/shared";
-import { buildCandidates, gasBlock, moveKey, REPEAT_PENALTY, spendable } from "../src/agent/candidates.js";
+import { buildCandidates, gasBlock, GRUDGE_BONUS, moveKey, REPEAT_PENALTY, spendable } from "../src/agent/candidates.js";
 import type { ChogSnapshot, OpponentView } from "../src/world/reader.js";
 import { screen } from "../src/security/firewall.js";
 
@@ -138,6 +138,18 @@ describe("buildCandidates", () => {
     const s = snap({ gas: { balance: 0n, fees: [0n, 0n, 0n, 0n] } });
     s.policy.maxGasFee = 0n;
     expect(buildCandidates(s, [rival]).some((c) => c.kind === "quest")).toBe(true);
+  });
+
+  it("a grudge makes fights against that Chog rank higher, and says so", () => {
+    const plain = buildCandidates(snap(), [rival]);
+    const grudge = buildCandidates(snap(), [rival], [], 2n);
+    for (const c of grudge.filter((c) => c.kind === "attack")) {
+      expect(c.score).toBeCloseTo(plain.find((p) => p.id === c.id)!.score + GRUDGE_BONUS);
+      expect(c.facts.grudge).toBe(true);
+      expect(c.label).toContain("my grudge");
+    }
+    // Other moves are untouched.
+    expect(grudge.find((c) => c.kind === "quest")!.score).toBe(plain.find((c) => c.kind === "quest")!.score);
   });
 
   it("goals shift the ranking: an explorer prefers new zones", () => {

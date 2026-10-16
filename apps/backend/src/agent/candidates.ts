@@ -138,8 +138,11 @@ export function penalizeRepeats(cands: Candidate[], recent: string[]): Candidate
   });
 }
 
-export function buildCandidates(s: ChogSnapshot, opponents: OpponentView[], recent: string[] = []): Candidate[] {
-  return explainRest(s, penalizeRepeats(menu(s, opponents), recent));
+/** How much a fight against the owner's grudge target outranks an equivalent fight. */
+export const GRUDGE_BONUS = 1;
+
+export function buildCandidates(s: ChogSnapshot, opponents: OpponentView[], recent: string[] = [], grudge: bigint | null = null): Candidate[] {
+  return explainRest(s, penalizeRepeats(menu(s, opponents, grudge), recent));
 }
 
 /** Why a Chog with nothing but rest on its menu is resting, in words its owner can act on. */
@@ -160,7 +163,7 @@ function explainRest(s: ChogSnapshot, cands: Candidate[]): Candidate[] {
   return [{ ...rest, label: REST_REASONS[reason]!, facts: { reason } }];
 }
 
-function menu(s: ChogSnapshot, opponents: OpponentView[]): Candidate[] {
+function menu(s: ChogSnapshot, opponents: OpponentView[], grudge: bigint | null): Candidate[] {
   const w = goalWeights(s.character.goalMask);
   const out: Candidate[] = [
     { id: "rest", kind: "rest", cost: 0n, label: "Rest and wait for a better moment", score: 0.05, facts: {} },
@@ -228,18 +231,20 @@ function menu(s: ChogSnapshot, opponents: OpponentView[]): Candidate[] {
         const repGain = p * 16 - (1 - p) * 8;
         const giant = o.level >= s.character.level + ARENA.giantGap;
         const xp = (p * ARENA.winXp + (1 - p) * ARENA.lossXp) * xpMult;
+        const isGrudge = grudge !== null && o.tokenId === grudge;
         const score =
           w.money * ev / 10 +
           w.rep * repGain / 8 +
           w.strength * (xp / 40 + (giant ? 0.5 : 0)) -
-          (1 - p) * 0.6; // an injury costs tempo
+          (1 - p) * 0.6 + // an injury costs tempo
+          (isGrudge ? GRUDGE_BONUS : 0);
         out.push({
           id: `attack-${o.tokenId}-${tier}`,
           kind: "attack",
           tokenId: o.tokenId,
           tier,
           cost: fee,
-          label: `Challenge Chog #${o.tokenId} (level ${o.level}) for ${chog(fee)} CHOG`,
+          label: `Challenge ${isGrudge ? "my grudge, " : ""}Chog #${o.tokenId} (level ${o.level}) for ${chog(fee)} CHOG`,
           score,
           facts: {
             opponentLevel: o.level,
@@ -249,6 +254,7 @@ function menu(s: ChogSnapshot, opponents: OpponentView[]): Candidate[] {
             expectedChog: round(ev),
             expectedRep: round(repGain),
             giantSlayerChance: giant,
+            ...(isGrudge ? { grudge: true } : {}),
           },
         });
       }

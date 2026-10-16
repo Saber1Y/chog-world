@@ -113,8 +113,9 @@ export class Agent {
       return { tokenId, status: "skipped", note: "waiting for a result" };
     }
 
-    const opponents = await this.scout(s);
-    const candidates = buildCandidates(s, opponents, await this.recentMoves(s.key));
+    const grudge = row?.grudgeTokenId ? BigInt(row.grudgeTokenId) : null;
+    const opponents = await this.scout(s, grudge);
+    const candidates = buildCandidates(s, opponents, await this.recentMoves(s.key), grudge);
     const recent = (await this.journal.list(s.key, { limit: 5 })).map((e) => e.title);
     const ctx: DecisionContext = {
       tokenId,
@@ -127,6 +128,7 @@ export class Agent {
       remainingBudgetChog: Number(s.policy.remaining) / Number(CHOG),
       injured: s.character.injuredUntil > s.blockTime,
       recent,
+      grudge,
     };
     // Nothing to choose between: rest without asking the decider (an LLM call would be wasted).
     const decision = candidates.length > 1 ? await this.decider.decide(ctx, candidates) : heuristic(ctx, candidates);
@@ -206,7 +208,7 @@ export class Agent {
   }
 
   /** Opponents near this Chog's level, from Chogs the world knows about. */
-  private async scout(s: ChogSnapshot) {
+  private async scout(s: ChogSnapshot, grudge: bigint | null = null) {
     const rows = await this.db
       .select({ tokenId: chogs.tokenId, level: chogs.level })
       .from(chogs)
@@ -217,6 +219,8 @@ export class Agent {
       .sort((a, b) => a.dist - b.dist)
       .slice(0, this.cfg.scoutCount)
       .map((r) => r.id);
+    // The grudge target is always on the list, whatever its level.
+    if (grudge !== null && grudge !== s.tokenId && !picks.includes(grudge)) picks.unshift(grudge);
     return this.reader.opponents(s.key, s.owner, picks);
   }
 

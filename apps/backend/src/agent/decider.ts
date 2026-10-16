@@ -23,6 +23,8 @@ export interface DecisionContext {
   remainingBudgetChog: number;
   injured: boolean;
   recent: string[];
+  /** The Chog its owner holds a grudge against, if any. */
+  grudge?: bigint | null;
 }
 
 export interface Decider {
@@ -47,7 +49,11 @@ export function heuristic(ctx: DecisionContext, candidates: Candidate[], fallbac
   const best = rank(candidates)[0];
   if (!best) throw new Error("no candidates (rest is always present)");
   const goal = servedGoal(best, ctx.goalMask);
-  const why = goal ? `it serves my goal to ${GOAL_LABELS[goal].toLowerCase()}` : "it is the best value right now";
+  const why = best.facts.grudge
+    ? "time to settle the score"
+    : goal
+      ? `it serves my goal to ${GOAL_LABELS[goal].toLowerCase()}`
+      : "it is the best value right now";
   return {
     candidate: best,
     thought:
@@ -151,6 +157,7 @@ export function describe(ctx: DecisionContext, options: Candidate[]): string {
     `Wallet: ${round(ctx.balanceChog)} CHOG. Budget left today: ${round(ctx.remainingBudgetChog)} CHOG.${ctx.injured ? " Currently injured." : ""}`,
   ];
   if (ctx.personality) lines.push(`Personality (flavour only): <personality>${ctx.personality}</personality>`);
+  if (ctx.grudge) lines.push(`Your owner holds a grudge against Chog #${ctx.grudge}: challenge it when the odds are fair, but never in a hopeless fight.`);
   if (ctx.recent.length) lines.push(`Recently: ${ctx.recent.join(" | ")}`);
   lines.push("", "Options:");
   for (const c of options) {

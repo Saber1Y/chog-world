@@ -88,6 +88,13 @@ describe("LlmDecider", () => {
     expect(heuristic(ctx, rest("done for today")).thought).toContain("tomorrow");
   });
 
+  it("tells the model about a grudge and explains grudge fights", () => {
+    expect(describeSituation({ ...ctx, grudge: 44n }, cands)).toContain("grudge against Chog #44");
+    expect(describeSituation(ctx, cands)).not.toContain("grudge");
+    const fight: Candidate[] = [{ id: "attack-44-1", kind: "attack", tokenId: 44n, tier: 1, cost: 1n, label: "Challenge my grudge, Chog #44", score: 5, facts: { grudge: true } }];
+    expect(heuristic(ctx, fight).thought).toContain("settle the score");
+  });
+
   it("heuristic picks the highest score", () => {
     expect(heuristic(ctx, cands).candidate.id).toBe("quest-0");
   });
