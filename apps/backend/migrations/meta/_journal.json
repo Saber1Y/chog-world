@@ -8,6 +8,13 @@
       "when": 1791747077993,
       "tag": "0000_dusty_magus",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792165437460,
+      "tag": "0001_ordinary_tarot",
+      "breakpoints": true
     }
   ]
 }

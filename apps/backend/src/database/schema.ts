@@ -24,6 +24,8 @@ export const chogs = pgTable(
     goalMask: integer("goal_mask").notNull().default(0),
     nickname: text("nickname"),
     personality: text("personality"),
+    /** Owner-chosen rival the agent should prefer to challenge (token id), or null. */
+    grudgeTokenId: text("grudge_token_id"),
     nextTickAt: timestamp("next_tick_at", { withTimezone: true }).notNull().defaultNow(),
     lastTickAt: timestamp("last_tick_at", { withTimezone: true }),
     lastTickNote: text("last_tick_note"),

@@ -1,0 +1,1 @@
+ALTER TABLE "chogs" ADD COLUMN "grudge_token_id" text;

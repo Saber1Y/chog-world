@@ -28,3 +28,17 @@ export function profileMessage(p: {
     `Issued: ${p.issuedAt}`,
   ].join("\n");
 }
+
+/**
+ * The exact text an owner signs to set (or clear, with `target` null) the Chog their Chog holds a
+ * grudge against. Built the same way by the web app and the backend.
+ */
+export function grudgeMessage(p: { chainId: number; tokenId: bigint; target: bigint | null; issuedAt: string }): string {
+  return [
+    "CHOG World: set my Chog's grudge",
+    `Chain: ${p.chainId}`,
+    `Chog: #${p.tokenId}`,
+    `Grudge against: ${p.target === null ? "nobody" : `#${p.target}`}`,
+    `Issued: ${p.issuedAt}`,
+  ].join("\n");
+}
