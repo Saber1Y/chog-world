@@ -152,6 +152,19 @@ describe("buildCandidates", () => {
     expect(grudge.find((c) => c.kind === "quest")!.score).toBe(plain.find((c) => c.kind === "quest")!.score);
   });
 
+  it("a fightable grudge is the only fight on the menu; a hopeless one changes nothing", () => {
+    const easy: OpponentView = { ...rival, tokenId: 5n, key: "0x5555555555555555555555555555555555555555555555555555555555555555", stats: { hp: 40, atk: 5, def: 1, spd: 2, crit: 0, element: 1 } };
+    const withGrudge = buildCandidates(snap(), [rival, easy], [], 2n);
+    const fights = withGrudge.filter((c) => c.kind === "attack");
+    expect(fights.length).toBeGreaterThan(0);
+    expect(fights.every((c) => c.facts.grudge)).toBe(true);
+    expect(withGrudge.some((c) => c.kind === "quest")).toBe(true);
+
+    const titan: OpponentView = { ...rival, stats: { hp: 999, atk: 99, def: 60, spd: 60, crit: 30, element: 0 } };
+    const hopeless = buildCandidates(snap(), [titan, easy], [], 2n);
+    expect(hopeless.some((c) => c.kind === "attack" && c.facts.grudge === undefined)).toBe(true);
+  });
+
   it("goals shift the ranking: an explorer prefers new zones", () => {
     const explorer = buildCandidates(snap({}, { goalMask: 4 }), []).sort((a, b) => b.score - a.score)[0]!;
     expect(explorer.id).toMatch(/^quest-[3-6]$/);

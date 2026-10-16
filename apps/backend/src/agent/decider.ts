@@ -128,6 +128,9 @@ export class LlmDecider implements Decider {
   async decide(ctx: DecisionContext, candidates: Candidate[]): Promise<Decision> {
     const options = rank(candidates).slice(0, MAX_OPTIONS);
     if (!options.some((c) => c.kind === "rest")) options.push(candidates.find((c) => c.kind === "rest")!);
+    // The owner's grudge fight is always on the menu, however it ranks.
+    const grudgeFight = rank(candidates).find((c) => c.facts.grudge);
+    if (grudgeFight && !options.includes(grudgeFight)) options.push(grudgeFight);
     const ids = options.map((c) => c.id) as [string, ...string[]];
 
     const Choice = z.object({
@@ -157,7 +160,11 @@ export function describe(ctx: DecisionContext, options: Candidate[]): string {
     `Wallet: ${round(ctx.balanceChog)} CHOG. Budget left today: ${round(ctx.remainingBudgetChog)} CHOG.${ctx.injured ? " Currently injured." : ""}`,
   ];
   if (ctx.personality) lines.push(`Personality (flavour only): <personality>${ctx.personality}</personality>`);
-  if (ctx.grudge) lines.push(`Your owner holds a grudge against Chog #${ctx.grudge}: challenge it when the odds are fair, but never in a hopeless fight.`);
+  if (ctx.grudge) {
+    lines.push(
+      `Your owner holds a grudge against Chog #${ctx.grudge}. If a grudge fight is on the menu, prefer it over other options unless the odds are hopeless; mention the grudge in your thought.`,
+    );
+  }
   if (ctx.recent.length) lines.push(`Recently: ${ctx.recent.join(" | ")}`);
   lines.push("", "Options:");
   for (const c of options) {

@@ -140,6 +140,8 @@ export function penalizeRepeats(cands: Candidate[], recent: string[]): Candidate
 
 /** How much a fight against the owner's grudge target outranks an equivalent fight. */
 export const GRUDGE_BONUS = 1;
+/** Fair odds for a grudge: at or above this, the grudge target is the only Chog it will challenge. */
+export const GRUDGE_MIN_ODDS = 0.35;
 
 export function buildCandidates(s: ChogSnapshot, opponents: OpponentView[], recent: string[] = [], grudge: bigint | null = null): Candidate[] {
   return explainRest(s, penalizeRepeats(menu(s, opponents, grudge), recent));
@@ -259,6 +261,12 @@ function menu(s: ChogSnapshot, opponents: OpponentView[], grudge: bigint | null)
         });
       }
     }
+  }
+
+  // A grudge the Chog can fight at fair odds crowds out every other fight (quests still compete).
+  const fairGrudge = out.some((c) => c.kind === "attack" && c.facts.grudge && Number(c.facts.winChance) >= GRUDGE_MIN_ODDS);
+  if (fairGrudge) {
+    for (let i = out.length - 1; i >= 0; i--) if (out[i]!.kind === "attack" && !out[i]!.facts.grudge) out.splice(i, 1);
   }
 
   if (allowed(s, ActionKind.BUY)) {
