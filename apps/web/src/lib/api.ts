@@ -101,7 +101,15 @@ export interface ChogView {
   pendingBattleId: string;
   blockTime: number;
   profile: { nickname: string | null; personality: string | null } | null;
-  agent: { enrolled: boolean; nextTickAt: string; lastTickAt: string | null; lastTickNote: string | null; inPilot: boolean } | null;
+  agent: {
+    enrolled: boolean;
+    nextTickAt: string;
+    lastTickAt: string | null;
+    lastTickNote: string | null;
+    inPilot: boolean;
+    /** Token id of the Chog its owner holds a grudge against. */
+    grudge: string | null;
+  } | null;
   earned: string;
 }
 
@@ -192,6 +200,8 @@ export const api = {
   chogBattles: (tokenId: string) => request<Battle[]>(`/chogs/${tokenId}/battles`),
   createAccount: (tokenId: string) =>
     request<{ account: Address; created: boolean; txHashes?: Hex[] }>(`/chogs/${tokenId}/account`, { method: "POST" }),
+  setGrudge: (tokenId: string, body: { target: string | null; issuedAt: string; signature: Hex }) =>
+    request<{ grudge: string | null }>(`/chogs/${tokenId}/grudge`, { method: "PUT", body: JSON.stringify(body) }),
   setProfile: (tokenId: string, body: { nickname: string | null; personality: string | null; issuedAt: string; signature: Hex }) =>
     request<{ nickname: string | null; personality: string | null }>(`/chogs/${tokenId}/profile`, { method: "PUT", body: JSON.stringify(body) }),
   nudge: (tokenId: string) => request<{ queued: boolean }>(`/chogs/${tokenId}/nudge`, { method: "POST" }),

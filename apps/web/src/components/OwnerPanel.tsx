@@ -20,6 +20,7 @@ import { api, type ChogView } from "@/lib/api";
 import { chog as fmtChog, untilLabel } from "@/lib/format";
 import { gasTank, mon } from "@/lib/gas";
 import { GasTopUp } from "./GasTopUp";
+import { GrudgePicker } from "./GrudgePicker";
 import { useTx, type TxState } from "@/hooks/useTx";
 import { useSaveProfile } from "@/hooks/useSaveProfile";
 import { TxStatus } from "./TxStatus";
@@ -291,6 +292,10 @@ function AgentTab({ chog, deployment, onDone }: { chog: ChogView; deployment: De
           </ActionButton>
           <TxStatus state={goalsTx.state} />
         </div>
+      </div>
+
+      <div className="border-t-2 border-night-3 pt-5">
+        <GrudgePicker chog={chog} onDone={onDone} />
       </div>
 
       <div className="space-y-3 border-t-2 border-night-3 pt-5">

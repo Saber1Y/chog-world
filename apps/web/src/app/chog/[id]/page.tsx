@@ -250,6 +250,14 @@ function AgentStatus({ chog: c, injured, buffed, goals, isOwner }: { chog: ChogV
           <p className="mt-1 text-sm font-bold text-gold">Send it CHOG in Your controls → Wallet to get it moving again.</p>
         )}
         {buffed && <p className="mt-2 inline-block rounded-full bg-monad/25 px-2 py-0.5 text-xs font-bold text-monad">+50% XP active</p>}
+        {c.agent?.grudge && (
+          <p className="mt-2 text-sm">
+            <span className="text-muted">Grudge: </span>
+            <Link href={`/chog/${c.agent.grudge}`} className="font-bold text-danger underline decoration-dotted underline-offset-4">
+              Chog #{c.agent.grudge}
+            </Link>
+          </p>
+        )}
         {goals.length > 0 && (
           <p className="mt-3 text-sm">
             <span className="text-muted">Goals: </span>
