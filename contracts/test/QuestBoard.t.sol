@@ -113,8 +113,8 @@ contract QuestBoardTest is ChogWorldBase {
         assertTrue(won, "every DNA beats the slime");
         assertFalse(late);
         assertEq(xp, 20);
-        assertGe(reward, 6 ether);
-        assertLe(reward, 12 ether);
+        assertGe(reward, 4 ether);
+        assertLe(reward, 7 ether);
         assertEq(chog.balanceOf(account) - before, reward);
         ChogState.Character memory c = w.state.character(_key(ALICE_CHOG));
         assertEq(c.xp, 20);

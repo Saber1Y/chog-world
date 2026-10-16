@@ -78,16 +78,19 @@ abstract contract ChogWorldDeployer {
         items.setItem(23, 300 ether, ChogItems.Kind.ARMOR, 3, true);
     }
 
+    /// @dev Rewards are tuned so the Treasury mostly recycles player fees: every Chog wins the Slime Pit, so
+    ///      it pays about its fee back (an XP quest, not a farm); harder hunts pay well only to Chogs strong
+    ///      enough to win them. A small seed covers the rest.
     function _seedQuests(QuestBoard quests) internal {
-        quests.setQuest(Q_SLIME_PIT, _hunt(5 ether, 6 ether, 12 ether, 20, 1, 0, 3_000, 1, Stats(40, 8, 2, 4, 0, 1)));
+        quests.setQuest(Q_SLIME_PIT, _hunt(5 ether, 4 ether, 7 ether, 20, 1, 0, 3_000, 1, Stats(40, 8, 2, 4, 0, 1)));
         quests.setQuest(
-            Q_BANDIT_CAMP, _hunt(15 ether, 18 ether, 35 ether, 45, 3, 1, 1_500, 11, Stats(130, 17, 9, 11, 8, 2))
+            Q_BANDIT_CAMP, _hunt(15 ether, 14 ether, 26 ether, 45, 3, 1, 1_500, 11, Stats(130, 17, 9, 11, 8, 2))
         );
         quests.setQuest(
-            Q_ELDER_WYRM, _hunt(40 ether, 60 ether, 120 ether, 120, 8, 3, 2_000, 13, Stats(260, 30, 16, 14, 12, 0))
+            Q_ELDER_WYRM, _hunt(40 ether, 50 ether, 100 ether, 120, 8, 3, 2_000, 13, Stats(260, 30, 16, 14, 12, 0))
         );
         for (uint8 zone; zone < 4; zone++) {
-            QuestBoard.Quest memory e = _base(2 ether, 1 ether, 4 ether, 15, 1, zone);
+            QuestBoard.Quest memory e = _base(2 ether, 1 ether, 3 ether, 15, 1, zone);
             e.kind = QuestBoard.Kind.EXPLORE;
             e.cooldown = 2 hours;
             e.lootBps = 1_000;
