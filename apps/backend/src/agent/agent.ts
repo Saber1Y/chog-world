@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, lte, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lte, ne, or, sql } from "drizzle-orm";
 import { CHOG, type Deployment } from "@chog-world/shared";
 import type { Hex } from "viem";
 import type { Database } from "../database/db.js";
@@ -178,7 +178,8 @@ export class Agent {
       .select({ key: chogs.key })
       .from(chogs)
       .where(or(eq(chogs.enrolled, true), isNotNull(chogs.lastTickAt)))
-      .orderBy(asc(chogs.createdAt), asc(chogs.key))
+      // Ties (same block second) go to the lower token number, so the pilot is stable.
+      .orderBy(asc(chogs.createdAt), asc(sql`cast(${chogs.tokenId} as integer)`))
       .limit(max);
     return new Set(rows.map((r) => r.key));
   }
