@@ -6,7 +6,7 @@ export const DEPLOYMENTS: Partial<Record<number, Deployment>> = {
       "arena": "0xB1dEFeC81D8F85a5Aa1871661ce9b5f586812d61",
       "chainId": 143,
       "chogToken": "0x350035555E10d9AfAF1566AaebfCeD5BA6C27777",
-      "collection": "0x9994604c3D3C43B82A79B41281E202613313Afba",
+      "collection": "0xc96d31F8626c6D03Fae5dCD3d61e3FB9F4a73763",
       "items": "0xB9919af84FC3EA83d5983999070Cd5ee8abFC1eB",
       "operator": "0xaDaA7f21Fb843140E20115D84F51F6f85D5342D1",
       "quests": "0x10f6e5301cf2f3f0415b62B8F9334a08ab22C490",

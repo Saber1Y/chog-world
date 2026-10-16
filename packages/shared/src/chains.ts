@@ -30,9 +30,9 @@ export const EXTERNAL = {
   multicall3: "0xcA11bde05977b3631167028862bE2a173976CA11",
 } as const satisfies Record<string, Address>;
 
-/** The real Chog NFT and $CHOG on Monad mainnet. */
+/** The real Chog NFT (Chog Genesis) and $CHOG on Monad mainnet. */
 export const MAINNET_ASSETS = {
-  chogNft: "0x9994604c3D3C43B82A79B41281E202613313Afba",
+  chogNft: "0xc96d31F8626c6D03Fae5dCD3d61e3FB9F4a73763",
   chogToken: "0x350035555E10d9AfAF1566AaebfCeD5BA6C27777",
-  chogSupply: 2662,
+  chogSupply: 1969,
 } as const;
