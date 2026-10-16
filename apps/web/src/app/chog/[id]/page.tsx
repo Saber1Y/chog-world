@@ -281,7 +281,7 @@ function AgentStatus({ chog: c, injured, buffed, goals, isOwner }: { chog: ChogV
             <div className={`h-full ${pctBudget > 85 ? "bg-danger" : "bg-gold"}`} style={{ width: `${pctBudget}%` }} />
           </div>
         </div>
-        {tank.charges && (
+        {tank.charges && c.policy.active && (
           <p className={`text-xs ${tank.empty ? "font-bold text-danger" : "text-muted"}`}>
             Gas tank: {mon(tank.balance)} MON
             {tank.empty ? (isOwner ? " · top it up in Your controls → Wallet" : " · waiting for its owner") : ` · about ${tank.moves} quests`}
