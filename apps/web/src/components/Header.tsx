@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { isLocalFork, isTestnet } from "@/lib/config";
+import { isLocalFork, isTestnet, OTHER_NETWORK_URL } from "@/lib/config";
 
 const NAV = [
   { href: "/", label: "World" },
@@ -37,10 +37,18 @@ export function Header() {
           >
             local
           </span>
+        ) : isTestnet ? (
+          <span className="hidden rounded-full border-2 border-gold/60 px-2 py-0.5 text-xs font-semibold text-gold sm:inline">testnet</span>
         ) : (
-          isTestnet && (
-            <span className="hidden rounded-full border-2 border-gold/60 px-2 py-0.5 text-xs font-semibold text-gold sm:inline">testnet</span>
-          )
+          <span className="hidden rounded-full border-2 border-mint/60 px-2 py-0.5 text-xs font-semibold text-mint sm:inline">mainnet pilot</span>
+        )}
+        {OTHER_NETWORK_URL && !isLocalFork && (
+          <a
+            href={OTHER_NETWORK_URL}
+            className="hidden text-xs font-semibold text-muted underline decoration-dotted underline-offset-4 transition-colors hover:text-paper sm:inline"
+          >
+            {isTestnet ? "Go to mainnet" : "Try it free on testnet"}
+          </a>
         )}
         <nav className="ml-auto hidden items-center gap-1 md:flex" aria-label="Main">
           {NAV.map((n) => {
