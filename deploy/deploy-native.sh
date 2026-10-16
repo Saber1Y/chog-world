@@ -37,7 +37,10 @@ cd ..
 rm -rf app.old
 [ -d app ] && mv app app.old
 mv app.new app
-pm2 restart chogworld-backend >/dev/null
+# Every CHOG World backend on this host (testnet, and mainnet when it runs) shares this build.
+for name in $(pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).map(p=>p.name).filter(n=>n.startsWith("chogworld-")).join(" ")))'); do
+  pm2 restart "$name" >/dev/null
+done
 rm -rf app.old
 for _ in $(seq 1 30); do
   if curl -fs 127.0.0.1:9100/health; then echo; exit 0; fi
