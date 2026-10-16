@@ -22,7 +22,7 @@ import {DevChog, DevCHOG} from "./dev/DevTokens.sol";
 ///      DEPLOYMENT_FILE (default "<chainId>.json"; use "local.json" for anvil forks).
 contract Deploy is Script, ChogWorldDeployer {
     uint256 internal constant MONAD = 143;
-    address internal constant REAL_CHOG_NFT = 0x9994604c3D3C43B82A79B41281E202613313Afba;
+    address internal constant REAL_CHOG_NFT = 0xc96d31F8626c6D03Fae5dCD3d61e3FB9F4a73763; // Chog Genesis
     address internal constant REAL_CHOG_TOKEN = 0x350035555E10d9AfAF1566AaebfCeD5BA6C27777;
     IERC6551Registry internal constant REGISTRY = IERC6551Registry(0x000000006551c19487814612e58FE06813775758);
     address internal constant ACCOUNT_PROXY = 0x55266d75D1a14E4572138116aF39863Ed6596E7F;

@@ -19,7 +19,7 @@ contract MonadForkTest is Test, ChogWorldDeployer {
     IERC6551Registry internal constant REGISTRY = IERC6551Registry(0x000000006551c19487814612e58FE06813775758);
     address internal constant ACCOUNT_PROXY = 0x55266d75D1a14E4572138116aF39863Ed6596E7F;
     address internal constant ACCOUNT_V3 = 0x41C8f39463A868d3A88af00cd0fe7102F30E44eC;
-    address internal constant CHOG_NFT = 0x9994604c3D3C43B82A79B41281E202613313Afba;
+    address internal constant CHOG_NFT = 0xc96d31F8626c6D03Fae5dCD3d61e3FB9F4a73763; // Chog Genesis
     IERC20 internal constant CHOG = IERC20(0x350035555E10d9AfAF1566AaebfCeD5BA6C27777);
     uint256 internal constant TOKEN_ID = 1;
 
