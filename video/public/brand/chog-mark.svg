@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- CHOG World mark: a Chog peeking out of a coin pile. Ink #0b0716, hair #6a3fd1, coin #ffd23f. -->
+  <defs><clipPath id="c"><rect width="64" height="64"/></clipPath></defs>
+  <g clip-path="url(#c)" stroke="#0b0716" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M10 46 L9 27 L5 16 L16 20 L19 6 L27 15 L33 2 L39 15 L46 6 L49 20 L59 16 L55 27 L54 46 Z" fill="#6a3fd1" stroke-width="3"/>
+    <ellipse cx="32" cy="37" rx="17" ry="15" fill="#fdf0dc" stroke-width="3"/>
+    <path d="M15 32 L21 26.5 L24 31 L29 25 L32 30 L35 25 L40 31 L43 26.5 L49 32 C49 24 42 20 32 20 C22 20 15 24 15 32 Z" fill="#6a3fd1" stroke-width="2.6"/>
+    <ellipse cx="25.5" cy="38" rx="4" ry="4.6" fill="#0b0716" stroke="none"/>
+    <ellipse cx="38.5" cy="38" rx="4" ry="4.6" fill="#0b0716" stroke="none"/>
+    <circle cx="27" cy="36.2" r="1.5" fill="#fff" stroke="none"/>
+    <circle cx="40" cy="36.2" r="1.5" fill="#fff" stroke="none"/>
+    <ellipse cx="19.5" cy="43" rx="2.6" ry="1.5" fill="#ff7aa8" stroke="none"/>
+    <ellipse cx="44.5" cy="43" rx="2.6" ry="1.5" fill="#ff7aa8" stroke="none"/>
+    <path d="M29.5 45 Q32 47.2 34.5 45" stroke-width="1.8"/>
+    <circle cx="13" cy="61" r="10" fill="#ffd23f" stroke-width="3"/>
+    <circle cx="51" cy="61" r="10" fill="#ffd23f" stroke-width="3"/>
+    <circle cx="32" cy="63" r="11" fill="#ffd23f" stroke-width="3"/>
+    <circle cx="32" cy="63" r="6.5" stroke="#e0a800" stroke-width="2.2"/>
+    <circle cx="13" cy="61" r="5.5" stroke="#e0a800" stroke-width="2"/>
+    <circle cx="51" cy="61" r="5.5" stroke="#e0a800" stroke-width="2"/>
+  </g>
+</svg>

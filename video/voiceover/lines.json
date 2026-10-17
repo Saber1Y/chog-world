@@ -1,0 +1,71 @@
+{
+  "voice": {
+    "name": "The Neighbor",
+    "archetype": "feat_04_the_neighbor",
+    "instruct": "female, young adult, moderate pitch, american accent",
+    "seed": 43
+  },
+  "lines": [
+    {
+      "id": "intro-01",
+      "text": "This is a Chog."
+    },
+    {
+      "id": "intro-02",
+      "text": "Right now, it just sits in your wallet."
+    },
+    {
+      "id": "intro-03",
+      "text": "Chog World gives it a wallet, and a mind of its own."
+    },
+    {
+      "id": "intro-04",
+      "text": "It quests, picks fights with rivals, and earns. All on its own, inside the limits you set."
+    },
+    {
+      "id": "intro-05",
+      "text": "Every win, every scar, every title becomes part of it."
+    },
+    {
+      "id": "intro-06",
+      "text": "And everything it earns moves with the NFT."
+    },
+    {
+      "id": "intro-07",
+      "text": "Chog World. Every Chog has a look. Now give it a life.",
+      "whole": true
+    },
+    {
+      "id": "demo-01",
+      "text": "This is Chog World. Every Chog NFT gets its own wallet, and an AI agent that decides what it does: quests, arena fights, shopping, or rest. Everything happens onchain, and the owner sets the limits."
+    },
+    {
+      "id": "demo-02",
+      "text": "I'm on testnet, so I can mint a free test Chog. On mainnet, it's your real Chog Genesis."
+    },
+    {
+      "id": "demo-03",
+      "text": "Awakening takes four steps. It gets its own wallet. I let the game's rules contract act for it, never our server. I give it a name, a personality, goals, and a daily budget, and those limits are enforced onchain. Then I fund it with CHOG for fees, and a little MON, so it pays its own gas."
+    },
+    {
+      "id": "demo-04",
+      "text": "And now it's alive. Its first move was chosen by its AI, in its own voice. A few times a day, it decides again. It never needs me, and it can never spend more than I allowed."
+    },
+    {
+      "id": "demo-05",
+      "text": "I can still steer it. A grudge tells it which rival to go after. I can pause it, change its budget, or top up its gas tank, at any time."
+    },
+    {
+      "id": "demo-06",
+      "text": "Fights are settled onchain, from a block hash nobody can predict, and every replay is re-run in your browser and checked against the chain. Victories, titles, and rivalries climb the leaderboard."
+    },
+    {
+      "id": "demo-07",
+      "text": "Every Chog gets a share card that shows who it has become. Its level, gear, and titles stay with the NFT, even when it's sold."
+    },
+    {
+      "id": "demo-08",
+      "text": "Chog World is live on Monad mainnet for Chog Genesis holders, and free to try on testnet. Every Chog has a look. Now give it a life."
+    }
+  ]
+}
