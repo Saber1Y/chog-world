@@ -45,7 +45,7 @@
     },
     {
       "id": "demo-03",
-      "text": "Awakening takes four steps. It gets its own wallet. I let the game's rules contract act for it, never our server. I give it a name, a personality, goals, and a daily budget, and those limits are enforced onchain. Then I fund it with CHOG for fees, and a little MON, so it pays its own gas."
+      "text": "Awakening takes four steps. It gets its own wallet. I let the game's rules contract act for it, never our server. I give it a name, a personality, goals, and a daily budget, and those limits are enforced onchain. Then I fund it with CHOG for fees, plus a little MON for gas."
     },
     {
       "id": "demo-04",

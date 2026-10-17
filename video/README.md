@@ -1,6 +1,6 @@
 # CHOG World video
 
-The 35-second motion intro, rendered from code with Remotion and narrated by VoiceStudio's "The Neighbor".
+The motion intro (about 23 seconds), rendered from code with Remotion and narrated by VoiceStudio's "The Neighbor".
 The scripts for the intro and the 3-minute demo are in `../docs/DEMO-SCRIPT.md`.
 
 ```bash
@@ -15,4 +15,4 @@ pnpm still            # out/poster.png
 ```
 
 Edit a line in `voiceover/lines.json`, then `node voiceover/generate.mjs <line-id>` to regenerate just that one.
-Scene timing lives in the `SCENES` table at the top of `src/Intro.tsx`.
+Scene timing is worked out from the voiceover lengths (`ORDER` at the top of `src/Intro.tsx`): edit a line, regenerate it, and the scenes re-time themselves.

@@ -6,6 +6,10 @@
 //
 //   node video/voiceover/generate.mjs            # all missing lines
 //   node video/voiceover/generate.mjs intro-03   # regenerate one line
+//   node video/voiceover/generate.mjs --tighten  # re-tighten every existing line without regenerating
+//
+// Every line is tightened: dead air trimmed from both ends, and pauses inside it capped, so the
+// narration sounds compact.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,9 +20,33 @@ const here = dirname(fileURLToPath(import.meta.url));
 // The rendered videos read the audio from public/, where Remotion serves static files.
 const out = join(here, "..", "public", "voiceover");
 const API = process.env.VOICESTUDIO_URL ?? "http://127.0.0.1:3900";
-const PAUSE_SECONDS = 0.28;
+const PAUSE_SECONDS = 0.12;
+/** Pauses inside a line longer than this are shortened to it. */
+const MAX_PAUSE_SECONDS = 0.15;
+// Low enough that soft word starts ("our", "MON") are never mistaken for silence.
+const SILENCE = "-55dB";
 const { voice, lines } = JSON.parse(readFileSync(join(here, "lines.json"), "utf8"));
-const only = new Set(process.argv.slice(2));
+const args = process.argv.slice(2);
+const tightenOnly = args.includes("--tighten");
+const only = new Set(args.filter((a) => !a.startsWith("--")));
+
+/**
+ * Trims silence at both ends (keeping 40 ms so words never clip) and caps every pause inside the
+ * line at MAX_PAUSE_SECONDS. Idempotent: tightening a tightened file changes nothing.
+ */
+function tighten(file) {
+  const tmp = `${file}.tight.wav`;
+  const trim = `silenceremove=start_periods=1:start_threshold=${SILENCE}:start_silence=0.04`;
+  const filter = [
+    trim,
+    "areverse",
+    trim,
+    "areverse",
+    `silenceremove=stop_periods=-1:stop_duration=${MAX_PAUSE_SECONDS}:stop_threshold=${SILENCE}:stop_silence=${MAX_PAUSE_SECONDS}`,
+  ].join(",");
+  execFileSync("ffmpeg", ["-v", "error", "-y", "-i", file, "-af", filter, "-c", "pcm_s16le", tmp]);
+  execFileSync("mv", [tmp, file]);
+}
 
 function seconds(file) {
   return Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file]).toString().trim());
@@ -64,7 +92,10 @@ for (const line of lines) {
     writeFileSync(list, files.flatMap((f, i) => (i ? [silence, f] : [f])).map((f) => `file '${f}'`).join("\n"));
     execFileSync("ffmpeg", ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", list, "-c", "pcm_s16le", file]);
     rmSync(dir, { recursive: true, force: true });
+    tighten(file);
     console.log(`generated ${line.id} (${parts.length} sentence${parts.length === 1 ? "" : "s"})`);
+  } else if (tightenOnly && existsSync(file)) {
+    tighten(file);
   }
   manifest[line.id] = { file: `voiceover/${line.id}.wav`, seconds: Math.round(seconds(file) * 100) / 100, text: line.text };
 }

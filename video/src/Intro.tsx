@@ -1,23 +1,49 @@
 import type { CSSProperties, ReactNode } from "react";
 import { AbsoluteFill, Audio, Img, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { Backdrop, C, Sticker, Tag, body, display, mono, usePop, useProgress } from "./brand";
+import manifest from "../public/voiceover/manifest.json";
 
 /**
- * CHOG World motion intro, 35 seconds at 30 fps. Scene starts are set from the voiceover lengths
- * (public/voiceover/manifest.json): each line lands a beat after its scene opens.
+ * CHOG World motion intro at 30 fps. Scene lengths are worked out from the voiceover itself
+ * (public/voiceover/manifest.json): each scene opens, its line starts LEAD frames later, and the
+ * next scene follows TAIL frames after the line ends, so the narration stays compact. Each scene
+ * also has a minimum length so its animation always has room to play.
  */
 export const FPS = 30;
-export const DURATION = 35 * FPS;
+const LEAD = 8;
+const TAIL = 6;
+/** How long the logo holds after the last line. */
+const HOLD = 30;
 
-const SCENES = {
-  plain: { from: 0, to: 120, vo: { id: "intro-01", at: 12 } },
-  wallet: { from: 120, to: 240, vo: { id: "intro-02", at: 126 } },
-  awake: { from: 240, to: 390, vo: { id: "intro-03", at: 252 } },
-  lives: { from: 390, to: 600, vo: { id: "intro-04", at: 400 } },
-  grows: { from: 600, to: 800, vo: { id: "intro-05", at: 608 } },
-  moves: { from: 800, to: 930, vo: { id: "intro-06", at: 806 } },
-  logo: { from: 930, to: DURATION, vo: { id: "intro-07", at: 936 } },
-} as const;
+const ORDER = [
+  { name: "plain", vo: "intro-01", min: 56 },
+  { name: "wallet", vo: "intro-02", min: 60 },
+  { name: "awake", vo: "intro-03", min: 80 },
+  { name: "lives", vo: "intro-04", min: 130 },
+  { name: "grows", vo: "intro-05", min: 100 },
+  { name: "moves", vo: "intro-06", min: 84 },
+  { name: "logo", vo: "intro-07", min: 0 },
+] as const;
+
+type SceneName = (typeof ORDER)[number]["name"];
+type Timing = { from: number; to: number; vo: { id: string; at: number } };
+
+function timeline(): { scenes: Record<SceneName, Timing>; duration: number } {
+  const scenes = {} as Record<SceneName, Timing>;
+  let t = 0;
+  for (const s of ORDER) {
+    const line = (manifest as Record<string, { seconds: number }>)[s.vo];
+    if (!line) throw new Error(`voiceover line ${s.vo} is missing; run pnpm voiceover`);
+    const vo = Math.ceil(line.seconds * FPS);
+    const length = Math.max(s.min, LEAD + vo + (s.name === "logo" ? HOLD : TAIL));
+    scenes[s.name] = { from: t, to: t + length, vo: { id: s.vo, at: t + LEAD } };
+    t += length;
+  }
+  return { scenes, duration: t };
+}
+
+const { scenes: SCENES, duration } = timeline();
+export const DURATION = duration;
 
 /** Layout helpers: everything is sized in units of the short side, so 16:9, 1:1 and 9:16 all work. */
 function useLayout() {
@@ -210,22 +236,22 @@ function Moment({ tag, color, delay, children }: { tag: string; color: string; d
 function SceneLives() {
   const { u, wide } = useLayout();
   const slide = useProgress(0, 22);
-  const limits = usePop(118);
+  const limits = usePop(96);
   return (
     <AbsoluteFill style={{ flexDirection: wide ? "row" : "column", alignItems: "center", justifyContent: "center", gap: 70 * u }}>
       <div style={{ transform: `translateX(${wide ? -40 * slide * u : 0}px) scale(${1 - 0.1 * slide})` }}>
         <ChogCard src="art/chog-lv1.png" size={500 * u} />
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 26 * u }}>
-        <Moment tag="QUEST" color={C.gold} delay={14}>
+        <Moment tag="QUEST" color={C.gold} delay={10}>
           Cleared Slime Pit: +20 XP, +5.4 CHOG
         </Moment>
-        <Moment tag="ARENA" color={C.danger} delay={40}>
+        <Moment tag="ARENA" color={C.danger} delay={32}>
           Beat Chog #2 in the Arena (+14 rep)
         </Moment>
-        <Moment tag="THINKS" color={C.monad} delay={66}>
+        <Moment tag="THINKS" color={C.monad} delay={54}>
           <span style={{ fontStyle: "italic" }}>
-            “<Typewriter text="Time to settle the score with Chog #2!" start={72} />”
+            “<Typewriter text="Time to settle the score with Chog #2!" start={60} cps={40} />”
           </span>
         </Moment>
         <div style={{ ...limits.style, display: "flex", gap: 14 * u, alignItems: "center", fontFamily: body, fontWeight: 600, fontSize: 30 * u, color: C.mint, paddingLeft: 8 * u }}>
@@ -251,12 +277,12 @@ function SceneGrows() {
   const { u, wide } = useLayout();
   const size = (wide ? 620 : 520) * u;
   // Four stages across the scene; each crossfades in with a quick blur.
-  const stageAt = [0, 34, 70, 106];
-  const level = Math.round(interpolate(frame, [0, 120], [1, 22], { extrapolateRight: "clamp", easing: (t) => 1 - Math.pow(1 - t, 2) }));
+  const stageAt = [0, 24, 48, 72];
+  const level = Math.round(interpolate(frame, [0, 84], [1, 22], { extrapolateRight: "clamp", easing: (t) => 1 - Math.pow(1 - t, 2) }));
   const titles = [
-    { text: "Explorer", at: 34 },
-    { text: "Giant Slayer", at: 70 },
-    { text: "Unbroken", at: 106 },
+    { text: "Explorer", at: 24 },
+    { text: "Giant Slayer", at: 48 },
+    { text: "Unbroken", at: 72 },
   ];
   return (
     <AbsoluteFill style={{ flexDirection: wide ? "row" : "column", alignItems: "center", justifyContent: "center", gap: (wide ? 80 : 36) * u }}>
@@ -368,9 +394,9 @@ function SceneLogo() {
   const { u } = useLayout();
   const icon = usePop(0, { damping: 10 });
   const word = usePop(10);
-  const line1 = usePop(34);
-  const line2 = usePop(58);
-  const url = usePop(74);
+  const line1 = usePop(26);
+  const line2 = usePop(44);
+  const url = usePop(60);
   return (
     <Center style={{ flexDirection: "column", gap: 28 * u, textAlign: "center" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 28 * u }}>

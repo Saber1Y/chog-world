@@ -1,77 +1,77 @@
 {
   "intro-01": {
     "file": "voiceover/intro-01.wav",
-    "seconds": 1.68,
+    "seconds": 1.41,
     "text": "This is a Chog."
   },
   "intro-02": {
     "file": "voiceover/intro-02.wav",
-    "seconds": 1.97,
+    "seconds": 1.64,
     "text": "Right now, it just sits in your wallet."
   },
   "intro-03": {
     "file": "voiceover/intro-03.wav",
-    "seconds": 3.02,
+    "seconds": 2.72,
     "text": "Chog World gives it a wallet, and a mind of its own."
   },
   "intro-04": {
     "file": "voiceover/intro-04.wav",
-    "seconds": 4.88,
+    "seconds": 4.81,
     "text": "It quests, picks fights with rivals, and earns. All on its own, inside the limits you set."
   },
   "intro-05": {
     "file": "voiceover/intro-05.wav",
-    "seconds": 3.37,
+    "seconds": 3.08,
     "text": "Every win, every scar, every title becomes part of it."
   },
   "intro-06": {
     "file": "voiceover/intro-06.wav",
-    "seconds": 2.78,
+    "seconds": 2.54,
     "text": "And everything it earns moves with the NFT."
   },
   "intro-07": {
     "file": "voiceover/intro-07.wav",
-    "seconds": 3.28,
+    "seconds": 3.08,
     "text": "Chog World. Every Chog has a look. Now give it a life."
   },
   "demo-01": {
     "file": "voiceover/demo-01.wav",
-    "seconds": 12.17,
+    "seconds": 11.12,
     "text": "This is Chog World. Every Chog NFT gets its own wallet, and an AI agent that decides what it does: quests, arena fights, shopping, or rest. Everything happens onchain, and the owner sets the limits."
   },
   "demo-02": {
     "file": "voiceover/demo-02.wav",
-    "seconds": 5.24,
+    "seconds": 4.57,
     "text": "I'm on testnet, so I can mint a free test Chog. On mainnet, it's your real Chog Genesis."
   },
   "demo-03": {
     "file": "voiceover/demo-03.wav",
-    "seconds": 17.58,
-    "text": "Awakening takes four steps. It gets its own wallet. I let the game's rules contract act for it, never our server. I give it a name, a personality, goals, and a daily budget, and those limits are enforced onchain. Then I fund it with CHOG for fees, and a little MON, so it pays its own gas."
+    "seconds": 14.92,
+    "text": "Awakening takes four steps. It gets its own wallet. I let the game's rules contract act for it, never our server. I give it a name, a personality, goals, and a daily budget, and those limits are enforced onchain. Then I fund it with CHOG for fees, plus a little MON for gas."
   },
   "demo-04": {
     "file": "voiceover/demo-04.wav",
-    "seconds": 10.78,
+    "seconds": 9.43,
     "text": "And now it's alive. Its first move was chosen by its AI, in its own voice. A few times a day, it decides again. It never needs me, and it can never spend more than I allowed."
   },
   "demo-05": {
     "file": "voiceover/demo-05.wav",
-    "seconds": 7.99,
+    "seconds": 6.95,
     "text": "I can still steer it. A grudge tells it which rival to go after. I can pause it, change its budget, or top up its gas tank, at any time."
   },
   "demo-06": {
     "file": "voiceover/demo-06.wav",
-    "seconds": 10.84,
+    "seconds": 10.17,
     "text": "Fights are settled onchain, from a block hash nobody can predict, and every replay is re-run in your browser and checked against the chain. Victories, titles, and rivalries climb the leaderboard."
   },
   "demo-07": {
     "file": "voiceover/demo-07.wav",
-    "seconds": 7.11,
+    "seconds": 6.42,
     "text": "Every Chog gets a share card that shows who it has become. Its level, gear, and titles stay with the NFT, even when it's sold."
   },
   "demo-08": {
     "file": "voiceover/demo-08.wav",
-    "seconds": 8.88,
+    "seconds": 7.78,
     "text": "Chog World is live on Monad mainnet for Chog Genesis holders, and free to try on testnet. Every Chog has a look. Now give it a life."
   }
 }
