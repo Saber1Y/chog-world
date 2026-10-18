@@ -1,8 +1,8 @@
 # CHOG World
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)
-![Tests](https://img.shields.io/badge/tests-141%20passing-brightgreen)
-![Onchain](https://img.shields.io/badge/onchain-Monad%20testnet-blue)
+![Tests](https://img.shields.io/badge/tests-152%20passing-brightgreen)
+![Onchain](https://img.shields.io/badge/onchain-Monad%20mainnet%20%2B%20testnet-blue)
 ![Loop](https://img.shields.io/badge/loop-decide%20%E2%86%92%20act%20%E2%86%92%20resolve%20%E2%86%92%20evolve-blueviolet)
 ![Stack](https://img.shields.io/badge/stack-Solidity%20+%20NestJS%20+%20Next.js%20+%20ERC--6551-orange)
 
@@ -11,6 +11,10 @@
 A Chog Genesis NFT is a picture.
 CHOG World gives each one its own wallet, hidden combat DNA, and an autonomous agent that quests, fights and shops on its own, inside spending limits the owner sets onchain.
 The Chog levels up, earns titles and scars, and its picture changes with it, and everything it earns lives in a wallet that moves with the NFT when it is sold.
+
+[![Watch the CHOG World intro (23 seconds)](docs/media/chog-world-intro-poster.png)](docs/media/chog-world-intro.mp4)
+
+*Watch the 23-second intro: [docs/media/chog-world-intro.mp4](docs/media/chog-world-intro.mp4) (rendered from code in [`video/`](video), narrated by VoiceStudio's "The Neighbor").*
 
 Mainnet pilot: [chog-world-mainnet.vercel.app](https://chog-world-mainnet.vercel.app) (real Chog Genesis and $CHOG) · Free testnet: [chog-world-zeta.vercel.app](https://chog-world-zeta.vercel.app) · APIs: [mainnet](https://api-mainnet.chogworld.162-62-231-147.sslip.io/health), [testnet](https://api.chogworld.162-62-231-147.sslip.io/health).
 
@@ -74,6 +78,8 @@ Open the site, connect a wallet on Monad testnet, open *My Chogs*, and awaken a 
 Within one tick it picks its first move, and the journal on its page starts filling in on its own.
 
 ## Screenshots
+
+The intro film is at [docs/media/chog-world-intro.mp4](docs/media/chog-world-intro.mp4); its source and the 3-minute demo script are in [`video/`](video) and [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md).
 
 ![Landing page with the evolved Chogs in a fanned card stack](docs/screenshots/home.png)
 
@@ -403,7 +409,7 @@ The testnet keeper decides with the heuristic, which is why journal thoughts are
 | `ChogItems` / `Treasury` | 11 | Shop, soulbound trophies, emission cap |
 | `Invariants.t.sol` | 5 | Spend never exceeds caps; no action after the owner changes |
 | `MonadFork.t.sol` | fork | Real registry, V3 and Chog NFT on Monad mainnet, including the gas fee |
-| Backend (vitest) | 40 | Model chain and decider fallbacks, candidates, pacing, gas tank, digests, render, end-to-end with gas fees on PGlite or Postgres |
+| Backend (vitest) | 51 | Model chain and decider fallbacks, candidates, grudges, pacing, gas tank, pilot cap, digests, render and share cards, end-to-end with gas fees on PGlite or Postgres |
 | Shared (vitest) | 7 | Engine and DNA parity with Solidity |
 
 ```bash
